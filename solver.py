@@ -19,12 +19,12 @@ A = 16.0      # systolic array dimension
 K = 3.0       # kernel size
 
 # input layer dimension
-H = 128.0      # height
+H = 128.0     # height
 W = 256.0     # width
-C = 128.0     # channel
+C = 512.0     # channel
 
 # memory bandwith 
-B = 8.0
+B = 2.0
 
 # buffer size
 buffer_size = 2.0*1024.0*1024.0
@@ -40,6 +40,35 @@ buffer_size = 2.0*1024.0*1024.0
 # l_mem_r = B*(c_0*h_0xw_0 + C*h_0xw_0)
 # # if channel-major
 # l_mem_c = B*(c_0*h_0xw_0 + C*K*K*h_0xw_0)
+
+
+#########################################################
+#                 general process                       #
+#########################################################
+
+def process_parameter(x, row_major):
+
+    res = [math.ceil(C/x[0]), C/math.ceil(C/x[0]), \
+            math.ceil(W*H/x[1]), H*W/math.ceil(W*H/x[1])]
+
+    print(math.ceil(C/x[0]), C/math.ceil(C/x[0]))
+    print(math.ceil(W*H/x[1]), H*W/math.ceil(W*H/x[1]))
+
+    x[0] = 16*math.floor(x[0]/16)
+    x[1] = 16*math.floor(x[1]/16)
+
+    print(math.ceil(C/x[0]), C/math.ceil(C/x[0]))
+    print(math.ceil(W*H/x[1]), H*W/math.ceil(W*H/x[1]))
+
+    if (row_major):
+        total_transfer = (res[1]*res[3]+res[3]*C)*res[2]*res[0]\
+                            +(res[1]*res[3]+K*K*C*res[3])*res[0]
+    else:
+        total_transfer = (res[1]*res[3]+K*K*C*res[1])*res[0]*res[2]\
+                            +(res[1]*res[3]+res[3]*C)*res[2]
+
+    print("total_transfer", total_transfer)
+    return [res, total_transfer]
 
 #########################################################
 #               general constraints                     #
@@ -101,13 +130,13 @@ def opti_mem_row_major():
     print(buffer_constraint2(solution.x))
     print(mem_bound_constraint(solution.x))
 
-    
+    process_parameter(solution.x, True)
 
 def opti_comp_row_major():
     # set the initial guess;
     x0 = [A,A]
     # for row_major_constraint1
-    con1 = {'type': 'ineq', 'fun': row_major_constraint1}
+    con1 = {'type': 'ineq', 'fun': row_major_constraint}
     # for mem_bound_constraint
     con2 = {'type': 'ineq', 'fun': comp_bound_constraint}
     # for the buffer_constraint
@@ -127,6 +156,8 @@ def opti_comp_row_major():
     print("buffer size", buffer_constraint1(solution.x))
     print(buffer_constraint2(solution.x))
     print(comp_bound_constraint(solution.x))
+
+    process_parameter(solution.x, True)
 
 ########################################################
 # channel-major constraint solving obj and constraints #
@@ -167,11 +198,13 @@ def opti_mem_channel_major():
     print(buffer_constraint2(solution.x))
     print(mem_bound_constraint(solution.x))
 
+    process_parameter(solution.x, False)
+
 def opti_comp_channel_major():
     # set the initial guess;
     x0 = [A,A]
     # for row_major_constraint1
-    con1 = {'type': 'ineq', 'fun': channel_major_constraint1}
+    con1 = {'type': 'ineq', 'fun': channel_major_constraint}
     # for mem_bound_constraint
     con2 = {'type': 'ineq', 'fun': comp_bound_constraint}
     # for the buffer_constraint
@@ -191,6 +224,9 @@ def opti_comp_channel_major():
     print("buffer size", buffer_constraint1(solution.x))
     print(buffer_constraint2(solution.x))
     print(comp_bound_constraint(solution.x))
+
+    process_parameter(solution.x, False)
+
 
 def opti_mem():
     print("=================================")
@@ -212,22 +248,6 @@ def opti_comp():
 
 
 def optimizeLayer(height, width, channel, w_number):
-    # info for systolic array
-    A = 16.0      # systolic array dimension
-
-    # info for weights
-    K = 3.0       # kernel size
-
-    # input layer dimension
-    H = 128.0      # height
-    W = 256.0     # width
-    C = 128.0     # channel
-
-    # memory bandwith 
-    B = 8.0
-
-    # buffer size
-    buffer_size = 2.0*1024.0*1024.0
 
     # if it is possible to be memory-bound only;
     if (K*K*C)/(A*A) < B or B/((K*K*C)/(A*A) - B) > 1:
@@ -236,82 +256,6 @@ def optimizeLayer(height, width, channel, w_number):
         # both cases are possible;
         opti_mem()
         opti_comp()
-
-
-
-
-    # plotMemoryTraffic(keys, w_batchs, total_traffics)
-    # plotMemoryUsage(keys, total_mems)
-
-   
-
-# def plotMemoryUsage(keys, total_mems):
-#     keys_log2 = np.log2(keys)
-
-
-#     plt.rc('font', size=10)
-#     ax1 = plt.figure(figsize=(6, 3)).add_subplot(111)
-#     ax1.set_ylabel('Memory Size (in log2)', fontsize=12, fontweight='bold')
-#     ax1.set_xscale('log', basex=2)
-#     plt.setp(ax1.spines.values(), linewidth=2)
-
-#     ax1.set_xlabel('Tile size (x*y)', fontsize=12, fontweight='bold')
-#     # p1 = ax1.bar(keys_log2, total_mems, 0.4, align='center',color='#71985E',\
-#     #     edgecolor=['k']*len(total_mems), linewidth=2, hatch="/");
-
-#     p1 = ax1.plot(keys, total_mems, color='#71985E', linestyle='none',\
-#             linewidth=2, markeredgecolor='k', marker='^', markersize=8);
-
-#     plt.ticklabel_format(axis='y', style='sci', scilimits=(-2,2))
-#     plt.subplots_adjust(left=0.10, bottom=0.20, right=0.95, top=0.9,
-#                 wspace=0.2, hspace=0.2)
-
-#     ax1.tick_params(axis="y",direction="in")
-#     ax1.tick_params(axis="x",direction="in")
-#     # ax1.set_ylim(0, 150)
-#     plt.grid(color='grey', which='major', axis='y', linestyle='--') 
-#     # plt.legend((p1[0], p2[0]), ('Batch', 'Traffic'), \
-#     #         bbox_to_anchor=(0., 1.01, 1., .101), loc=3,
-#     #         ncol=2, borderaxespad=0., frameon=False)
-#     ax1.set_axisbelow(True)
-    
-#     plt.savefig("sched_mem.pdf");
-
-# def plotMemoryTraffic(keys, w_batchs, total_traffics):
-#     plt.rc('font', size=10)
-#     ax1 = plt.figure(figsize=(6, 3)).add_subplot(111)
-#     ax1.set_ylabel('Batch Size', fontsize=12, fontweight='bold')
-#     ax1.set_xscale('log', basex=2)
-#     plt.setp(ax1.spines.values(), linewidth=2)
-
-#     ax2 = ax1.twinx()
-#     ax2.set_ylabel('Memory Traffic in Log10', fontsize=12, fontweight='bold')
-#     ax1.set_xlabel('Tile size (x*y)', fontsize=12, fontweight='bold')
-#     # p1 = ax1.bar(keys, total_mem, 0.4, align='center',color='#71985E',\
-#     #     edgecolor=['k']*len(ebs_axis_ls), linewidth=2, hatch="/");
-    
-#     p1 = ax1.plot(keys, w_batchs, color='#FFBF56', linestyle='--',\
-#             linewidth=2, markeredgecolor='k', marker='^', markersize=8);
-#     p2 = ax2.plot(keys, total_traffics, color='#8154D1', linestyle=':',\
-#             linewidth=2, markeredgecolor='k', marker='o', markersize=8);
-
-#     plt.subplots_adjust(left=0.1, bottom=0.20, right=0.9, top=0.9,
-#                 wspace=0.2, hspace=0.2)
-
-#     ax1.tick_params(axis="y",direction="in")
-#     ax2.tick_params(axis="y",direction="in")
-#     ax1.tick_params(axis="x",direction="in")
-#     ax1.set_ylim(0, 150)
-#     ax2.set_ylim(7.0, 10.0)
-#     plt.grid(color='grey', which='major', axis='y', linestyle='--') 
-#     plt.legend((p1[0], p2[0]), ('Batch', 'Traffic'), \
-#             bbox_to_anchor=(0., 1.01, 1., .101), loc=3,
-#             ncol=2, borderaxespad=0., frameon=False)
-#     ax1.set_axisbelow(True)
-    
-#     plt.savefig("sched_traffic.pdf");
-    
- 
 
 
 if __name__== '__main__':
