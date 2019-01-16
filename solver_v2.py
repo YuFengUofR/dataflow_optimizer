@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import minimize
 
+
 # info for systolic array
 A = 16.0      # systolic array dimension
 
@@ -31,16 +32,16 @@ B = 2.0/4
 buffer_size = 1.0*1024.0*1024.0
 
 # variables for optimization
-# this two has been encodes as x[2]; = {c_0, h_0xw_0};
+# this two has been encodes as x[3] = {c_0, h_0, w_0};
 # c_0  # number of channels per batch;
 # h_0xw_0 # size of tile per batch;
 
 # calculate the latency for compute and memory;
-# l_com = (K*K*c_0*h_0xw_0)/(R*R)
+# l_com = (K*K*c_0*h_0*w_0)/(R*R)
 # # if row-major
-# l_mem_r = (c_0*h_0xw_0 + C*h_0xw_0)/B
+# l_mem_r = (c_0*h_0*w_0 + C*h_0*w_0)/B
 # # if channel-major
-# l_mem_c = (c_0*h_0xw_0 + C*K*K*h_0xw_0)/B
+# l_mem_c = (c_0*h_0*w_0 + C*K*K*h_0*w_0)/B
 
 ###############################################################
 #                       general process                       #
@@ -48,33 +49,27 @@ buffer_size = 1.0*1024.0*1024.0
 
 def process_parameter(x, row_major, comp_bound):
 
-    res = [math.ceil(Co/x[0]), Co/math.ceil(Co/x[0]), \
-            math.ceil(W*H/x[1]), H*W/math.ceil(W*H/x[1])]
+    c_0 = Co/math.ceil(Co/x[0])
+    w_0 = W/math.ceil(W/x[1])
+    h_0 = H/math.ceil(H/x[2])
 
-    print(math.ceil(Co/x[0]), Co/math.ceil(Co/x[0]))
-    print(math.ceil(W*H/x[1]), H*W/math.ceil(W*H/x[1]))
-
-    x[0] = A*math.floor(x[0]/A)
-    x[1] = A*math.floor(x[1]/A)
-
-    print(math.ceil(Co/x[0]), Co/math.ceil(Co/x[0]))
-    print(math.ceil(W*H/x[1]), H*W/math.ceil(W*H/x[1]))
+    print(c_0, w_0, h_0, Co/c_0, W/w_0, H/h_0)
 
     if (row_major):
-        total_transfer = (res[1]*res[3]+res[3]*Ci)*res[2]*res[0]\
-                            +(res[1]*res[3]+K*K*Ci*res[3])*res[0]
+        total_transfer = (h_0*w_0*c_0+(h_0+2)*(w_0+2)*Ci)*H*W*Co/(h_0*w_0*c_0)\
+                            +(h_0*w_0*c_0+K*K*Ci*c_0)*Co/c_0
     else:
-        total_transfer = (res[1]*res[3]+K*K*Ci*res[1])*res[0]*res[2]\
-                            +(res[1]*res[3]+res[3]*Ci)*res[2]
+        total_transfer = (h_0*w_0*c_0+K*K*Ci*c_0)*H*W*Co/(h_0*w_0*c_0)\
+                            +(h_0*w_0*c_0+(h_0+2)*(w_0+2)*Ci)*H*W/(h_0*w_0)
 
     if comp_bound:
-        total_cycle = (res[0]/A*res[1]/A)*(Ci*K*K)*res[2]*res[3]
+        total_cycle = (H*W*Co)*(Ci*K*K)/(A*A)
     else:
         total_cycle = total_transfer/B
 
     print("total_transfer", total_transfer)
     print("total_cycle", total_cycle)
-    return [res, total_transfer]
+    return
 
 
 # this function is to verifer if a given hardware
@@ -91,13 +86,13 @@ def process_parameter(x, row_major, comp_bound):
 # make sure the buffer utilization is always larger than 0
 def buffer_constraint1(x):
     # buffer = ofmap + weights + ifmap
-    return x[0]*x[1] + Ci*K*K*x[0] + Ci*x[1]
+    return x[0]*x[1]*x[2]+Ci*K*K*x[0]+Ci*(x[1]+2)*(x[2]+2)
 
 # the upper bound of the buffer size;
 # make sure the buffer utilization is
 # always smaller than buffer size;
 def buffer_constraint2(x):
-    return buffer_size - (x[0]*x[1]+Ci*K*K*x[0]+Ci*x[1])
+    return buffer_size - (x[0]*x[1]*x[2]+Ci*K*K*x[0]+Ci*(x[1]+2)*(x[2]+2))
 
 
 ###############################################################
@@ -105,19 +100,22 @@ def buffer_constraint2(x):
 ###############################################################
 
 # the minimization objective of row-major
+# this objective is a simplified expression of 
+# [h_0*w_0*c_0+(h_0+2)(w_0+2)*Ci]*(H*W*Co)/(h_0*w_0*c_0)
+# + [K^2*Ci+h_0*w_0*c_0]*C/c_0
 def row_major_obj(x):
-    return H*W/(x[0]*x[1]) + K*K/x[0]
+    return H*W*Ci/x[0]*(1+2*(x[1]+x[2])/(x[1]*x[2]))+x[1]*x[2]/x[0]
 
 # make sure the load for row-major is always less than 
 # load for channel-major, range : [0, +inf]
 def row_major_constraint(x):
-    # simplified from K^2*C*x[0] > C*x[1]
-    return K*K*x[0] - x[1];
+    # simplified from K^2*C*c_0 > C*(h_0*w_0)
+    return K*K*x[0] - x[1]*x[2];
 
 # make sure the process is always memory-bound;
 # which is the latency for memory access is always 
 # greater than lantecy of compute;
-# (x[0]+C)*x[1]/B >= (K^2*C/A^2)*x[0]*x[1] 
+# (c_0+C)*(h_0*w_0)/B >= (K^2*C/A^2)*c_0*w_0*h_0 
 # range : [0, +inf]
 def row_major_mem_bound_constraint(x):
     return (x[0]+Ci)/B - K*K*Ci/(A*A)*x[0]
@@ -125,7 +123,7 @@ def row_major_mem_bound_constraint(x):
 # the main optimization of memory-bound and row-major case; 
 def opti_mem_row_major():
     # set the initial guess;
-    x0 = [A, A]
+    x0 = [A, math.sqrt(A), math.sqrt(A)]
     # for row_major_constraint1
     con1 = {'type': 'ineq', 'fun': row_major_constraint}
     # for mem_bound_constraint
@@ -135,7 +133,7 @@ def opti_mem_row_major():
     con4 = {'type': 'ineq', 'fun': buffer_constraint2}
 
     # summery all the bounds and constraints
-    bnds = ((A, Co), (A, H*W))
+    bnds = ((A, Co), (math.sqrt(A), H), (math.sqrt(A), W))
     cons= ([con1, con2, con3, con4])
 
     # call the external solver to solve the solution
@@ -153,7 +151,7 @@ def opti_mem_row_major():
 # make sure the process is always compute-bound;
 # which is the latency for compute is always 
 # greater than lantecy of memory access;
-# (x[0]+C)*x[1]/B <= (K^2*C/A^2)*x[0]*x[1] 
+# (c_0+C)*(h_0*w_0)/B <= (K^2*C/A^2)*c_0*h_0*w_0 
 # range : [0, +inf]
 def row_major_comp_bound_constraint(x):
     return K*K*Ci/(A*A)*x[0]-(Ci+x[0])/B
@@ -161,7 +159,7 @@ def row_major_comp_bound_constraint(x):
 # the main optimization of compute-bound and row-major case;
 def opti_comp_row_major():
     # set the initial guess;
-    x0 = [A,A]
+    x0 = [A, math.sqrt(A), math.sqrt(A)]
     # for row_major_constraint1
     con1 = {'type': 'ineq', 'fun': row_major_constraint}
     # for mem_bound_constraint
@@ -171,7 +169,7 @@ def opti_comp_row_major():
     con4 = {'type': 'ineq', 'fun': buffer_constraint2}
 
     # summery all the bounds and constraints
-    bnds = ((A, Co), (A, H*W))
+    bnds = ((A, Co), (math.sqrt(A), H), (math.sqrt(A), W))
     cons= ([con1, con2, con3, con4])
 
     # call the external solver to solve the solution
@@ -192,28 +190,30 @@ def opti_comp_row_major():
 ###############################################################
 
 # the minimization objective of channel-major
+# this is the simplified expression of 
+# (K^2*Ci*c_0+h_0*w_0*c_0)*(H*W*Co)/(h_0*w_0*c_0)
+# + [(h_0+2)(w_0+2)*Ci + h_0*w_0*c_0]*(H*W)/(h_0*w_0)
 def channel_major_obj(x):
-    # simplified from H*W*C/x[0] + K*K*C*C*W*H/x[1]
-    return  1/x[1] + K*K*Co/(x[0]*x[1])
+    return  (K*K*Ci*Co)/(x[1]*x[2])+2*(x[1]+x[2])*Co/(x[1]*x[2])+1/x[0]
 
 # make sure the load for channel-major is always less than 
 # load for row-major, range : [0, +inf]
 def channel_major_constraint(x):
-    # simplified from K^2*C*x[0] < C*x[1]
-    return x[1] - K*K*x[0];
+    # simplified from K^2*C*c_0 <= C*(h_0*w_0)
+    return x[1]*x[2] - K*K*x[0];
 
 # make sure the process is always memory-bound;
 # which is the latency for memory access is always 
 # greater than lantecy of compute;
-# x[0]*(x[1]+K^2*C)/B >= (K^2*C/A^2)*x[0]*x[1] 
+# c_0*(h_0*w_0+K^2*C)/B >= (K^2*C/A^2)*c_0*(h_0*w_0)
 # range : [0, +inf]
 def channel_major_mem_bound_constraint(x):
-    return (x[1]+K*K*Ci)/B - K*K*Ci/(A*A)*x[1]
+    return (x[1]*x[2]+K*K*Ci)/B - K*K*Ci/(A*A)*x[1]*x[2]
 
 # the main optimization of memory-bound and channel-major case;
 def opti_mem_channel_major():
     # set the initial guess;
-    x0 = [A,A]
+    x0 = [A, math.sqrt(A), math.sqrt(A)]
     # for row_major_constraint1
     con1 = {'type': 'ineq', 'fun': channel_major_constraint}
     # for mem_bound_constraint
@@ -223,7 +223,7 @@ def opti_mem_channel_major():
     con4 = {'type': 'ineq', 'fun': buffer_constraint2}
 
     # summery all the bounds and constraints
-    bnds = ((A, Co), (A, H*W))
+    bnds = ((A, Co), (math.sqrt(A), H), (math.sqrt(A), W))
     cons= ([con1, con2, con3, con4])
 
     # call the external solver to solve the solution
@@ -241,15 +241,15 @@ def opti_mem_channel_major():
 # make sure the process is always memory-bound;
 # which is the latency for memory access is always 
 # greater than lantecy of compute;
-# x[0]*(x[1]+K^2*C)/B <= (K^2*C/A^2)*x[0]*x[1] 
+# c_0*(h_0*w_0+K^2*C)/B >= (K^2*C/A^2)*c_0*(h_0*w_0) 
 # range : [0, +inf]
 def channel_major_comp_bound_constraint(x):
-    return K*K*Co/(A*A)*x[1] - (x[1]+K*K*Co)/B
+    return K*K*Co/(A*A)*x[1]*x[2] - (x[1]*x[2]+K*K*Co)/B
 
 # the main optimization of compute-bound and channel-major case;
 def opti_comp_channel_major():
     # set the initial guess;
-    x0 = [A,A]
+    x0 = [A, math.sqrt(A), math.sqrt(A)]
     # for row_major_constraint1
     con1 = {'type': 'ineq', 'fun': channel_major_constraint}
     # for mem_bound_constraint
@@ -259,7 +259,7 @@ def opti_comp_channel_major():
     con4 = {'type': 'ineq', 'fun': buffer_constraint2}
 
     # summery all the bounds and constraints
-    bnds = ((A, Co), (A, H*W))
+    bnds = ((A, Co), (math.sqrt(A), H), (math.sqrt(A), W))
     cons= ([con1, con2, con3, con4])
 
     # call the external solver to solve the solution
