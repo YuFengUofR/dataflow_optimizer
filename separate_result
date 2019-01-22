@@ -1,0 +1,291 @@
+('[Layer]', [512, 384, 6, 64, 7, 7, 2, False])
+('##[LAYER]##', 256, 192, 6, 64, 7, 7)
+=========================  Memory Bound  ==========================
+Row-major memory-bound case PASSED!
+(64.0, 25.6, 24.0, 1.0, 10.0, 8.0)
+('total_transfer', 4425383.999999999, 'total_cycle', 1106345.9999999998, 'systolic_array_utilization', 0.990489130436719, 'buffer_utilization', 0.07066497802734376)
+('channel major constraint', -363.05204326448563, 'NOT PASSED.')
+
+
+=========================  Compute Bound  =========================
+('Row-major compute-bound', -195.625, ' no longer bounded!')
+Channel-major compute-bound case PASSED!
+(64.0, 64.0, 96.0, 1.0, 4.0, 2.0)
+('total_transfer', 4356288.0, 'total_cycle', 3612672.0, 'systolic_array_utilization', 0.9990335656216288, 'buffer_utilization', 0.5372543334960938)
+
+
+('[Layer]', [256, 192, 64, 128, 5, 5, 2, False])
+('##[LAYER]##', 128, 96, 64, 128, 5, 5)
+=========================  Memory Bound  ==========================
+Row-major memory-bound case PASSED!
+(16.0, 4.0, 4.0, 8.0, 32.0, 24.0)
+('total_transfer', 41048064.0, 'total_cycle', 10262016.0, 'systolic_array_utilization', 1.0, 'buffer_utilization', 0.03076171875)
+('channel major constraint', -58.52510873108071, 'NOT PASSED.')
+
+
+=========================  Compute Bound  =========================
+('Row-major compute-bound', -1312.0, ' no longer bounded!')
+Channel-major compute-bound case PASSED!
+(64.0, 42.666666666666664, 32.0, 2.0, 3.0, 3.0)
+('total_transfer', 5814528.0, 'total_cycle', 9830400.0, 'systolic_array_utilization', 0.995829101050332, 'buffer_utilization', 0.5327962239583333)
+
+
+('[Layer]', [128, 96, 128, 256, 5, 5, 2, False])
+('##[LAYER]##', 64, 48, 128, 256, 5, 5)
+=========================  Memory Bound  ==========================
+Row-major memory-bound case PASSED!
+(16.0, 4.0, 4.0, 16.0, 16.0, 12.0)
+('total_transfer', 40722432.0, 'total_cycle', 10180608.0, 'systolic_array_utilization', 1.0, 'buffer_utilization', 0.061279296875)
+('channel major constraint', -59.79977229320144, 'NOT PASSED.')
+
+
+=========================  Compute Bound  =========================
+('Row-major compute-bound', -1024.0000000000318, ' no longer bounded!')
+Channel-major compute-bound case PASSED!
+(128.0, 21.333333333333332, 24.0, 2.0, 3.0, 2.0)
+('total_transfer', 4959232.0, 'total_cycle', 9830400.0, 'systolic_array_utilization', 0.983579325468559, 'buffer_utilization', 0.7257486979166666)
+
+
+('[Layer]', [64, 48, 256, 256, 3, 3, 1, False])
+('##[LAYER]##', 64, 48, 256, 256, 3, 3)
+=========================  Memory Bound  ==========================
+Row-major memory-bound case PASSED!
+(16.0, 4.0, 4.0, 16.0, 16.0, 12.0)
+('total_transfer', 29540352.0, 'total_cycle', 7385088.0, 'systolic_array_utilization', 1.0, 'buffer_utilization', 0.044189453125)
+('channel major constraint', -38.85817460516364, 'NOT PASSED.')
+
+
+=========================  Compute Bound  =========================
+('Row-major compute-bound', -1024.0000000000027, ' no longer bounded!')
+Channel-major compute-bound case PASSED!
+(128.0, 32.0, 24.0, 2.0, 2.0, 2.0)
+('total_transfer', 2871296.0, 'total_cycle', 7077888.0, 'systolic_array_utilization', 0.9606914473654646, 'buffer_utilization', 0.5908203125)
+
+
+('[Layer]', [64, 48, 256, 512, 3, 3, 1, False])
+('##[LAYER]##', 64, 48, 256, 512, 3, 3)
+=========================  Memory Bound  ==========================
+Row-major memory-bound case PASSED!
+(16.0, 4.0, 4.0, 32.0, 16.0, 12.0)
+('total_transfer', 59080704.0, 'total_cycle', 14770176.0, 'systolic_array_utilization', 1.0, 'buffer_utilization', 0.044189453125)
+('channel major constraint', -38.408291121793184, 'NOT PASSED.')
+
+
+=========================  Compute Bound  =========================
+('Row-major compute-bound', -63.99999999940337, ' no longer bounded!')
+Channel-major compute-bound case PASSED!
+(128.0, 32.0, 24.0, 4.0, 2.0, 2.0)
+('total_transfer', 6017024.0, 'total_cycle', 14155776.0, 'systolic_array_utilization', 0.9606914387645049, 'buffer_utilization', 0.5908203125)
+
+
+('[Layer]', [32, 24, 512, 512, 3, 3, 1, False])
+('##[LAYER]##', 32, 24, 512, 512, 3, 3)
+=========================  Memory Bound  ==========================
+Row-major memory-bound case PASSED!
+(16.0, 4.0, 4.0, 32.0, 8.0, 6.0)
+('total_transfer', 30474240.0, 'total_cycle', 7618560.0, 'systolic_array_utilization', 1.0, 'buffer_utilization', 0.088134765625)
+('channel major constraint', -39.532971510205655, 'NOT PASSED.')
+
+
+=========================  Compute Bound  =========================
+('Row-major compute-bound', -1489.0519027443202, ' no longer bounded!')
+Channel-major compute-bound case PASSED!
+(85.33333333333333, 16.0, 24.0, 6.0, 2.0, 1.0)
+('total_transfer', 4804608.0, 'total_cycle', 7077888.0, 'systolic_array_utilization', 0.8769841269841271, 'buffer_utilization', 0.634765625)
+
+
+('[Layer]', [32, 24, 512, 512, 3, 3, 2, False])
+('##[LAYER]##', 16, 12, 512, 512, 3, 3)
+=========================  Memory Bound  ==========================
+Row-major memory-bound case PASSED!
+(128.0, 8.0, 12.0, 4.0, 2.0, 1.0)
+('total_transfer', 3416064.0, 'total_cycle', 854016.0, 'systolic_array_utilization', 0.8375251679963791, 'buffer_utilization', 0.802734375)
+Channel-major memory-bound case PASSED!
+(34.13333333333333, 8.0, 6.0, 15.0, 2.0, 2.0)
+('total_transfer', 9422438.399999999, 'total_cycle', 2355609.5999999996, 'systolic_array_utilization', 0.6160652809872162, 'buffer_utilization', 0.274609375)
+
+
+=========================  Compute Bound  =========================
+('Row-major compute-bound', -9780.262975761838, ' no longer bounded!')
+Channel-major compute-bound case PASSED!
+(85.33333333333333, 8.0, 12.0, 6.0, 2.0, 1.0)
+('total_transfer', 4509696.0, 'total_cycle', 1769472.0, 'systolic_array_utilization', 0.8769841269841271, 'buffer_utilization', 0.611328125)
+
+
+('[Layer]', [16, 12, 512, 512, 3, 3, 1, False])
+('##[LAYER]##', 16, 12, 512, 512, 3, 3)
+=========================  Memory Bound  ==========================
+Row-major memory-bound case PASSED!
+(170.66666666666666, 8.0, 12.0, 3.0, 2.0, 1.0)
+('total_transfer', 2672640.0, 'total_cycle', 668160.0, 'systolic_array_utilization', 0.9977777641333493, 'buffer_utilization', 0.833984375)
+('channel major constraint', -39.532971510205655, 'NOT PASSED.')
+
+
+=========================  Compute Bound  =========================
+('Row-major compute-bound', -1489.051903110812, ' no longer bounded!')
+Channel-major compute-bound case PASSED!
+(26.94736842105263, 8.0, 12.0, 19.0, 2.0, 1.0)
+('total_transfer', 4711909.052631578, 'total_cycle', 1769472.0, 'systolic_array_utilization', 0.875, 'buffer_utilization', 0.18924753289473684)
+
+
+('[Layer]', [16, 12, 512, 1024, 3, 3, 2, False])
+('##[LAYER]##', 8, 6, 512, 1024, 3, 3)
+=========================  Memory Bound  ==========================
+Row-major memory-bound case PASSED!
+(170.66666666666666, 4.0, 6.0, 6.0, 2.0, 1.0)
+('total_transfer', 5197824.0, 'total_cycle', 1299456.0, 'systolic_array_utilization', 0.9495081410443542, 'buffer_utilization', 0.822265625)
+Channel-major memory-bound case PASSED!
+(16.0, 4.0, 6.0, 64.0, 2.0, 1.0)
+('total_transfer', 9482240.0, 'total_cycle', 2370560.0, 'systolic_array_utilization', 0.5012204354278799, 'buffer_utilization', 0.1390380859375)
+
+
+=========================  Compute Bound  =========================
+('Row-major compute-bound', -9780.262975772825, ' no longer bounded!')
+('Channel-major compute-bound', -588.0000000000098, ' no longer bounded!')
+
+
+('[Layer]', [8, 6, 1024, 512, 5, 5, 1, True])
+('##[LAYER]##', 8, 6, 1024, 512, 3, 3)
+=========================  Memory Bound  ==========================
+Row-major memory-bound case PASSED!
+(102.4, 4.0, 6.0, 5.0, 2.0, 1.0)
+('total_transfer', 4988928.0, 'total_cycle', 1247232.0, 'systolic_array_utilization', 0.9316555467110635, 'buffer_utilization', 0.94921875)
+('channel major constraint', -64.00000017924447, 'NOT PASSED.')
+
+
+=========================  Compute Bound  =========================
+('Row-major compute-bound', -5709.199306754674, ' no longer bounded!')
+('channel major constraint', -64.00000000001708, 'NOT PASSED.')
+
+
+('##[LAYER]##', 8, 6, 1024, 512, 2, 2)
+=========================  Memory Bound  ==========================
+Row-major memory-bound case PASSED!
+(170.66666666666666, 4.0, 6.0, 3.0, 2.0, 1.0)
+('total_transfer', 2269184.0, 'total_cycle', 567296.0, 'systolic_array_utilization', 0.9719433719204998, 'buffer_utilization', 0.7174479166666666)
+Channel-major memory-bound case PASSED!
+(19.692307692307693, 4.0, 6.0, 26.0, 2.0, 1.0)
+('total_transfer', 4155864.615384616, 'total_cycle', 1038966.153846154, 'systolic_array_utilization', 0.6250000002444918, 'buffer_utilization', 0.12424879807692309)
+
+
+=========================  Compute Bound  =========================
+('Row-major compute-bound', -6263.533073925949, ' no longer bounded!')
+('Channel-major compute-bound', -140.0, ' no longer bounded!')
+
+
+('[Layer]', [16, 12, 512, 256, 5, 5, 1, True])
+('##[LAYER]##', 16, 12, 512, 256, 3, 3)
+=========================  Memory Bound  ==========================
+Row-major memory-bound case PASSED!
+(128.0, 8.0, 12.0, 2.0, 2.0, 1.0)
+('total_transfer', 1372160.0, 'total_cycle', 343040.0, 'systolic_array_utilization', 0.9977777777137568, 'buffer_utilization', 0.642578125)
+('channel major constraint', -39.78614952933401, 'NOT PASSED.')
+
+
+=========================  Compute Bound  =========================
+('Row-major compute-bound', -1489.0519031140216, ' no longer bounded!')
+Channel-major compute-bound case PASSED!
+(25.6, 8.0, 12.0, 10.0, 2.0, 1.0)
+('total_transfer', 2315878.4, 'total_cycle', 884736.0, 'systolic_array_utilization', 0.875, 'buffer_utilization', 0.18320312500000002)
+
+
+('##[LAYER]##', 16, 12, 512, 256, 2, 2)
+=========================  Memory Bound  ==========================
+Row-major memory-bound case PASSED!
+(256.0, 8.0, 12.0, 1.0, 2.0, 1.0)
+('total_transfer', 645120.0, 'total_cycle', 161280.0, 'systolic_array_utilization', 0.9999999999757904, 'buffer_utilization', 0.591796875)
+Channel-major memory-bound case PASSED!
+(25.6, 8.0, 6.0, 10.0, 2.0, 2.0)
+('total_transfer', 2100428.8, 'total_cycle', 525107.2, 'systolic_array_utilization', 0.661784184781024, 'buffer_utilization', 0.090234375)
+
+
+=========================  Compute Bound  =========================
+('Row-major compute-bound', -3584.0, ' no longer bounded!')
+Channel-major compute-bound case PASSED!
+(51.2, 8.0, 12.0, 5.0, 2.0, 1.0)
+('total_transfer', 1031372.7999999998, 'total_cycle', 393216.0, 'systolic_array_utilization', 0.984375, 'buffer_utilization', 0.173046875)
+
+
+('[Layer]', [32, 24, 256, 128, 5, 5, 1, True])
+('##[LAYER]##', 32, 24, 256, 128, 3, 3)
+=========================  Memory Bound  ==========================
+Row-major memory-bound case PASSED!
+(128.0, 16.0, 24.0, 1.0, 2.0, 1.0)
+('total_transfer', 513024.0, 'total_cycle', 128256.0, 'systolic_array_utilization', 1.0, 'buffer_utilization', 0.4423828125)
+('channel major constraint', -39.615600479033404, 'NOT PASSED.')
+
+
+=========================  Compute Bound  =========================
+Solution with NaN, abort!
+Channel-major compute-bound case PASSED!
+(64.0, 16.0, 24.0, 2.0, 2.0, 1.0)
+('total_transfer', 632832.0, 'total_cycle', 884736.0, 'systolic_array_utilization', 0.8769841269841271, 'buffer_utilization', 0.2783203125)
+
+
+('##[LAYER]##', 32, 24, 256, 128, 2, 2)
+=========================  Memory Bound  ==========================
+Row-major memory-bound case PASSED!
+(128.0, 16.0, 12.0, 1.0, 2.0, 2.0)
+('total_transfer', 422912.0, 'total_cycle', 105728.0, 'systolic_array_utilization', 0.9849313239698114, 'buffer_utilization', 0.2099609375)
+Channel-major memory-bound case PASSED!
+(25.6, 8.0, 8.0, 5.0, 4.0, 3.0)
+('total_transfer', 1663795.2000000002, 'total_cycle', 415948.80000000005, 'systolic_array_utilization', 0.7021074970282583, 'buffer_utilization', 0.0509765625)
+
+
+=========================  Compute Bound  =========================
+('Row-major compute-bound', -2304.0, ' no longer bounded!')
+Channel-major compute-bound case PASSED!
+(128.0, 16.0, 24.0, 1.0, 2.0, 1.0)
+('total_transfer', 337920.0, 'total_cycle', 393216.0, 'systolic_array_utilization', 1.0, 'buffer_utilization', 0.2861328125)
+
+
+('[Layer]', [64, 48, 128, 64, 5, 5, 1, True])
+('##[LAYER]##', 64, 48, 128, 64, 3, 3)
+=========================  Memory Bound  ==========================
+Row-major memory-bound case PASSED!
+(64.0, 21.333333333333332, 16.0, 1.0, 3.0, 3.0)
+('total_transfer', 700416.0, 'total_cycle', 175104.0, 'systolic_array_utilization', 0.9758064514654138, 'buffer_utilization', 0.14241536458333331)
+('channel major constraint', -39.09080612499476, 'NOT PASSED.')
+
+
+=========================  Compute Bound  =========================
+('Row-major compute-bound', -1120.00000000002, ' no longer bounded!')
+Channel-major compute-bound case PASSED!
+(64.0, 32.0, 48.0, 1.0, 2.0, 1.0)
+('total_transfer', 631808.0, 'total_cycle', 884736.0, 'systolic_array_utilization', 0.9999999999999999, 'buffer_utilization', 0.37158203125)
+
+
+('##[LAYER]##', 64, 48, 128, 64, 2, 2)
+=========================  Memory Bound  ==========================
+Row-major memory-bound case PASSED!
+(64.0, 12.8, 12.0, 1.0, 5.0, 4.0)
+('total_transfer', 733286.3999999999, 'total_cycle', 183321.59999999998, 'systolic_array_utilization', 0.9423076923136606, 'buffer_utilization', 0.06591796875)
+Channel-major memory-bound case PASSED!
+(21.333333333333332, 8.0, 8.0, 3.0, 8.0, 6.0)
+('total_transfer', 1859584.0, 'total_cycle', 464896.0, 'systolic_array_utilization', 0.7953735436259886, 'buffer_utilization', 0.02392578125)
+
+
+=========================  Compute Bound  =========================
+('Row-major compute-bound', -1184.0, ' no longer bounded!')
+Channel-major compute-bound case PASSED!
+(64.0, 32.0, 48.0, 1.0, 2.0, 1.0)
+('total_transfer', 631808.0, 'total_cycle', 393216.0, 'systolic_array_utilization', 1.0, 'buffer_utilization', 0.33251953125)
+
+
+[4425383.999999999, 1106345.9999999998, 0.990489130436719, 0.07066497802734376, 1.0, 10.0, 8.0, 'M']
+[5814528.0, 9830400.0, 0.995829101050332, 0.5327962239583333, 2.0, 3.0, 3.0, 'C']
+[4959232.0, 9830400.0, 0.983579325468559, 0.7257486979166666, 2.0, 3.0, 2.0, 'C']
+[2871296.0, 7077888.0, 0.9606914473654646, 0.5908203125, 2.0, 2.0, 2.0, 'C']
+[6017024.0, 14155776.0, 0.9606914387645049, 0.5908203125, 4.0, 2.0, 2.0, 'C']
+[4804608.0, 7077888.0, 0.8769841269841271, 0.634765625, 6.0, 2.0, 1.0, 'C']
+[3416064.0, 854016.0, 0.8375251679963791, 0.802734375, 4.0, 2.0, 1.0, 'M']
+[2672640.0, 668160.0, 0.9977777641333493, 0.833984375, 3.0, 2.0, 1.0, 'M']
+[5197824.0, 1299456.0, 0.9495081410443542, 0.822265625, 6.0, 2.0, 1.0, 'M']
+[9977856.0, 2494464.0, 0.9316555467110635, 0.94921875, 5.0, 2.0, 1.0, 'M']
+[4538368.0, 1134592.0, 0.9719433719204998, 0.7174479166666666, 3.0, 2.0, 1.0, 'M']
+[2744320.0, 686080.0, 0.9977777777137568, 0.642578125, 2.0, 2.0, 1.0, 'M']
+[1290240.0, 322560.0, 0.9999999999757904, 0.591796875, 1.0, 2.0, 1.0, 'M']
+[1026048.0, 256512.0, 1.0, 0.4423828125, 1.0, 2.0, 1.0, 'M']
+[845824.0, 211456.0, 0.9849313239698114, 0.2099609375, 1.0, 2.0, 2.0, 'M']
+[1400832.0, 350208.0, 0.9758064514654138, 0.14241536458333331, 1.0, 3.0, 3.0, 'M']
+[1466572.7999999998, 366643.19999999995, 0.9423076923136606, 0.06591796875, 1.0, 5.0, 4.0, 'M']

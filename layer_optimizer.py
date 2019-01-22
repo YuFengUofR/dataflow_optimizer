@@ -21,7 +21,7 @@ W = 512.0        # width of ifmap
 Ci = 512.0      # channels for weights
 Co = 512.0      # channels for ofmap
 
-# memory bandwith number of bytes can be trasferred.
+# memory bandwith number of bytes can be transferred.
 B = 4.0/4
 
 # on-chip buffer size
@@ -52,7 +52,8 @@ res = []
 ###############################################################
 
 def process_parameter(x, row_major, comp_bound):
-    x = list(map(lambda i: math.floor(i), x))
+    global res
+    bound = "C"
     # make the tile size even for every batch
     c_0 = Co/math.ceil(Co/x[0])
     w_0 = W/math.ceil(W/x[1])
@@ -63,28 +64,34 @@ def process_parameter(x, row_major, comp_bound):
     # if it is row-major.
     if row_major:
         # (ofmap + ifmap)*total_batch + (ofmap+weights)*Co/c_0
-        total_transfer = (h_0*w_0*c_0+(S*h_0+2)*(S*w_0+2)*Ci)*H*W*Co/(h_0*w_0*c_0)\
+        total_transfer = (h_0*w_0*c_0+(S*h_0+2)*(S*w_0+2)*Ci)*(H*W*Co/(h_0*w_0*c_0)-Co/c_0)\
                             +(h_0*w_0*c_0+K_h*K_w*Ci*c_0)*Co/c_0
     # compute the total number of elements needed to be updated 
     # if it is channel-major.
     else:
         # (ofmap + weights)*total_batch + (ofmap+ifmap)*(H*W)/(h_0*w_0)
-        total_transfer = (h_0*w_0*c_0+K_h*K_w*Ci*c_0)*H*W*Co/(h_0*w_0*c_0)\
+        total_transfer = (h_0*w_0*c_0+K_h*K_w*Ci*c_0)*(H*W*Co/(h_0*w_0*c_0)-H*W/(h_0*w_0))\
                             +(h_0*w_0*c_0+(S*h_0+2)*(S*w_0+2)*Ci)*H*W/(h_0*w_0)
 
     # calculate the amount of cycles of computing all elements.
     if comp_bound:
+        bound = "C"
         total_cycle = (H*W*Co)*(Ci*K_h*K_w)/(A*A)
     else:
+        bound = "M"
         total_cycle = total_transfer/B
 
     # compute the utilization of systolic array
     util_sys_arr = x[0]/(math.ceil(x[0]/A)*A) \
                         * x[1]*x[2]/(math.ceil(x[1]*x[2]/A)*A)
-    print(x[0],(math.ceil(x[0]/A)*A), x[1]*x[2], (math.ceil(x[1]*x[2]/A)*A))
 
-    print("total_transfer", total_transfer, "total_cycle", total_cycle, "systolic_array_utilization", util_sys_arr)
-    res.append((total_transfer, total_cycle, util_sys_arr, Co/c_0, W/w_0, H/h_0))
+    # compute the utilization of systolic array
+    util_buf = buffer_constraint1([c_0, w_0, h_0])/buffer_size
+
+    # print(x[0],(math.ceil(x[0]/A)*A), x[1]*x[2], (math.ceil(x[1]*x[2]/A)*A))
+    print("total_transfer", total_transfer, "total_cycle", total_cycle, \
+        "systolic_array_utilization", util_sys_arr, "buffer_utilization", util_buf)
+    res.append([total_transfer, total_cycle, util_sys_arr, util_buf, Co/c_0, W/w_0, H/h_0, bound])
     return
 
 
@@ -102,13 +109,13 @@ def process_parameter(x, row_major, comp_bound):
 # make sure the buffer utilization is always larger than 0
 def buffer_constraint1(x):
     # buffer = ofmap + weights + ifmap
-    return x[0]*x[1]*x[2]+Ci*K_h*K_w*x[0]+Ci*(x[1]+2)*(x[2]+2)
+    return x[0]*x[1]*x[2]+Ci*K_h*K_w*x[0]+Ci*(S*x[1]+2)*(S*x[2]+2)
 
 # the upper bound of the buffer size;
 # make sure the buffer utilization is
 # always smaller than buffer size;
 def buffer_constraint2(x):
-    return buffer_size - (x[0]*x[1]*x[2]+Ci*K_h*K_w*x[0]+Ci*(x[1]+2)*(x[2]+2))
+    return buffer_size - (x[0]*x[1]*x[2]+Ci*K_h*K_w*x[0]+Ci*(S*x[1]+2)*(S*x[2]+2))
 
 
 ###############################################################
@@ -121,8 +128,11 @@ def buffer_constraint2(x):
 # + [K^2*Ci+h_0*w_0*c_0]*C/c_0
 # this expression can be finally reduce to:
 #   (H*W*Co/c_0 + 2(h_0+w_0)Ci*H*W*Co/(h_0*w_0*c_0)+h_0*w_0*Co/c_0
-def row_major_obj(x):
-    return H*W*Co/x[0]*(1+2*(x[1]+x[2])*Ci/(x[1]*x[2]))+x[1]*x[2]/x[0]
+def row_major_mem_obj(x):
+    return H*W*Co/x[0]*(1+2*S*(x[1]+x[2])*Ci/(x[1]*x[2])) + x[1]*x[2]/x[0]
+
+def row_major_comp_obj(x):
+    return H*W*Co/(x[1]*x[2]*x[0])
 
 # make sure the load for row-major is always less than 
 # load for channel-major, range : [0, +inf]
@@ -156,8 +166,8 @@ def opti_mem_row_major():
     cons= ([con1, con2, con3, con4])
 
     # call the external solver to solve the solution
-    solution = minimize(row_major_obj, x0, method='SLSQP',\
-                    bounds=bnds,constraints=cons)
+    solution = minimize(row_major_mem_obj, x0, method='SLSQP',\
+                    bounds=bnds, constraints=cons)
 
     passed = True
     if np.any(np.isnan(solution.x)):
@@ -209,7 +219,7 @@ def opti_comp_row_major():
     cons= ([con1, con2, con3, con4])
 
     # call the external solver to solve the solution
-    solution = minimize(row_major_obj, x0, method='SLSQP',\
+    solution = minimize(row_major_comp_obj, x0, method='SLSQP',\
                     bounds=bnds, constraints=cons)
 
     passed = True
@@ -243,8 +253,12 @@ def opti_comp_row_major():
 # this is the simplified expression of 
 # (K^2*Ci*c_0+h_0*w_0*c_0)*(H*W*Co)/(h_0*w_0*c_0)
 # + [(h_0+2)(w_0+2)*Ci + h_0*w_0*c_0]*(H*W)/(h_0*w_0)
-def channel_major_obj(x):
+def channel_major_mem_obj(x):
     return  (K_h*K_w*Ci*Co)/(x[1]*x[2])+2*(x[1]+x[2])*Co/(x[1]*x[2])+1/x[0]
+
+
+def channel_major_comp_obj(x):
+    return H*W*Co/(x[1]*x[2]*x[0])
 
 # make sure the load for channel-major is always less than 
 # load for row-major, range : [0, +inf]
@@ -277,7 +291,7 @@ def opti_mem_channel_major():
     cons= ([con1, con2, con3, con4])
 
     # call the external solver to solve the solution
-    solution = minimize(channel_major_obj, x0, method='SLSQP',\
+    solution = minimize(channel_major_mem_obj, x0, method='SLSQP',\
                     bounds=bnds, constraints=cons)
 
     passed = True
@@ -327,7 +341,7 @@ def opti_comp_channel_major():
     cons= ([con1, con2, con3, con4])
 
     # call the external solver to solve the solution
-    solution = minimize(channel_major_obj, x0, method='SLSQP',\
+    solution = minimize(channel_major_comp_obj, x0, method='SLSQP',\
                     bounds=bnds, constraints=cons)
 
     passed = True
@@ -388,18 +402,18 @@ def optimize(layer_info):
     if len(res) == 0:
         return None
 
-    ret  = res[0]
+    ret  = list(res[0])
 
     for item in res:
         if ret[1] > item[1]:
-            ret = item
+            ret = list(item)
 
-    return item
+    return ret
 
 def setup_hardware(config):
     global A, B, buffer_size
     A = config[0]
-    B = config[1]/4
+    B = config[1]/4.0
     buffer_size = config[2]
 
 
