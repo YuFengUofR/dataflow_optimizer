@@ -13,14 +13,14 @@ detail_profile = True
 static_schedule = True
 
 # set the switch whether we want to split the Deconv
-enable_split = True
+enable_split = False
 
 # if we combine two different sub-kernels and optimize them 
 # together, then, enable this switch
 enable_combine = False
 
 # add suffix to every plot for one configuration profiling
-suffix = "split"
+suffix = "static"
 
 # import my own modules
 from dnn_analysis import *
@@ -28,11 +28,16 @@ from dnn_analysis import *
 # depends on scheduling, imports different optimizer
 if static_schedule:
     from layer_static import optimize, setup_hardware
+    from layer3d_static import optimize3d, setup_hardware3d
 else:
     from layer_optimizer import optimize, setup_hardware
+    from layer3d_optimizer import optimize3d, setup_hardware3d
+
+# from layer3d_optimizer import optimize3d, setup_hardware3d
 
 # a list to store the dnn configuration 
 dnn = []
+dnn3d = []
 
 # a list to store all the optimization results
 results = []
@@ -44,28 +49,50 @@ results = []
 def import_dnn(filename=None):
     # clear all the previous contents;
     del dnn[:]
-    ifmap_dim = [960, 576, 6]
+    switch = False
+    ifmap_dim = [960, 576, 3]
+    ifmap3d_dim = [480, 288, 96, 64]
     weight_dim = []
+    weight3d_dim = []
 
     # The weight input format as follows: 
     # [out_channel,kenrel_width,kernel_height,stride,Deconv?]
     for line in open(filename):
-        ls = line.strip().split(",")
-        weight_dim.append([int(ls[0]), int(ls[1]), int(ls[2]),\
-                             int(ls[3]), ls[4] == 'True'])
+        if len(line) <= 1:
+            switch = True
+            continue
 
+        # check if we need to switch to 3d Conv.
+        if not switch: 
+            ls = line.strip().split(",")
+            weight_dim.append([int(ls[0]), int(ls[1]), int(ls[2]),\
+                             int(ls[3]), ls[4] == 'True'])
+        else:
+            ls = line.strip().split(",")
+            weight3d_dim.append([int(ls[0]), int(ls[1]), int(ls[2]),\
+                             int(ls[3]), int(ls[4]), ls[5] == 'True'])
+
+    # since we know there is no case that 2d Deconv in 3d stereo vision DNN,
+    # we don't consider 2D Deconv compute here. 
     for w in weight_dim:
         # first append the necessary information to compute this Conv layer 
         dnn.append(list(ifmap_dim+w))
+        # for Conv, scale down the ifmap dimemsion by its stride;
+        ifmap_dim = [ifmap_dim[0]/w[-2], ifmap_dim[1]/w[-2], w[0]]
+
+    # next, let's consider 3d dnn.
+    for w in weight3d_dim:
+        # first append the necessary information to compute this Conv layer 
+        dnn3d.append(list(ifmap3d_dim+w))
         # if it is Deconv;
         if w[-1]:
-            # increase the deconv ofmap by two, as default,
-            # we only consider stride fo 2
-            ifmap_dim = [ifmap_dim[0]*2, ifmap_dim[1]*2, w[0]]
+            # now, increase the deconv ofmap by two, as default, 
+            # we only consider stride fo 2 in Deconv
+            ifmap3d_dim = [ifmap3d_dim[0]*2, ifmap3d_dim[1]*2, ifmap3d_dim[2]*2, w[0]]
         else: 
             # if it is Conv, scale down the ifmap dimemsion by stride;
-            ifmap_dim = [ifmap_dim[0]/w[-2], ifmap_dim[1]/w[-2], w[0]]
-
+            ifmap3d_dim = [ifmap3d_dim[0]/w[-2], ifmap3d_dim[1]/w[-2], \
+                            ifmap3d_dim[2]/w[-2], w[0]]
 
 # The hardware constraints are:
 #   1. the on-chip buffer size; 
@@ -77,66 +104,35 @@ def hardware_constraints(sa_size=24.0, mem_bw=3.0, buf=2097152.0):
     buffer_size = buf;
     return [systolic_arr_size, memory_bandwidth, buffer_size]
 
-
-def opti_deconv(layer):
+# Optimize 3D Deconvlution:
+def opti_deconv3d(layer):
     # collect individual result from sub_kernels
     subs = []
-
-    # if the convolution size is odd;
-    if layer[5]%2 == 1:
-        sub1 = list(layer)
-        sub1[4] = (sub1[4]+1)/2
-        sub1[5] = (sub1[5]+1)/2
-        # set sub_res1 == None
-        sub_res1 = None
-        if enable_combine:
-            sub1[3] = sub1[3]*2
-            subs.append(optimize(sub1))
-        else:
-            res1 = optimize(sub1)
-            res1[0] = res1[0]*2
-            res1[1] = res1[1]*2
-            subs.append(res1)
-
-        # handle the second sub-kernel    
-        sub2 = list(layer)
-        sub2[4] = (sub2[4]-1)/2
-        sub2[5] = (sub2[5]-1)/2
-        if enable_combine:
-            sub2[3] = sub2[3]*2
-            subs.append(optimize(sub2))
-        else:
-            res2 = optimize(sub2)
-            res2[0] = res2[0]*2
-            res2[1] = res2[1]*2
-            subs.append(res2)
-
-    # if the convolution size is even;
-    else:
+    # number of same shape sub-kernels
+    num = [1,3,3,1]
+    sub_shape = [[2,2,2], [2,2,1], [2,1,1], [1,1,1]]
+    # In our case, we only handle 3x3x3 Deconv, 
+    # although, we can generalize into other cases;
+    for i in range(4):
         sub = list(layer)
-        sub[4] = sub[4]/2
-        sub[5] = sub[5]/2
+        # change the kernel shape
+        sub[5:8] = sub_shape[i]
+        # check if we want to combine sub-kernels;
         if enable_combine:
-            # this will consider four same-size sub-kernels 
-            # as one sub-kernel with more channels
-            sub[3] = sub[3]*4
-            subs.append(optimize(sub))
+            sub[3] = sub[3]*num[i]
+            subs.append(optimize3d(sub))
         else:
-            # without combining sub-kernels 
-            res = optimize(sub)
-            # times 4 of each individual sub-kernel's
-            # memory traffic and cycles.
-            res[0] = res[0]*4
-            res[1] = res[1]*4
+            res = optimize3d(sub)
+            res[0] = res[0]*num[i]
+            res[1] = res[1]*num[i]
             subs.append(res)
 
     ret = [0, 0, 0, 0]
     for item in subs:
         ret = [x+y for x,y in zip(ret,item)]
-
     ret[2] /= len(subs)
     ret[3] /= len(subs)
-    results.append(ret)
+    
     # sum all the results
     return ret
 
@@ -149,26 +145,36 @@ def opti_dnn():
     # optimize for each layer
     for layer in dnn:
         print("[Layer]",layer)
+        # start to optimize ordinary Conv layer.
+        tmp = list(layer)
+        # scale down the ifmap to the ifmap based on the stride size.
+        tmp[0] = layer[0]/layer[-2]
+        tmp[1] = layer[1]/layer[-2]
+        results.append(optimize(tmp))
 
+    # optimize for each layer
+    for layer in dnn3d:
         # check if this layer is Deconv, True == YES
         if layer[-1] == True:
             if enable_split:
                 # if split the deconv into smaller ones
-                opti_deconv(layer)
+                results.append(opti_deconv3d(layer))
             else:
                 # start to optimize ordinary Conv layer.
                 tmp = list(layer)
                 # scale down the ifmap to the ifmap based on the stride size.
                 tmp[0] = layer[0]*2
                 tmp[1] = layer[1]*2
-                results.append(optimize(tmp))
+                tmp[2] = layer[2]*2
+                results.append(optimize3d(tmp))
         else:
             # start to optimize ordinary Conv layer.
             tmp = list(layer)
             # scale down the ifmap to the ifmap based on the stride size.
             tmp[0] = layer[0]/layer[-2]
             tmp[1] = layer[1]/layer[-2]
-            results.append(optimize(tmp))
+            tmp[2] = layer[2]/layer[-2]
+            results.append(optimize3d(tmp))
 
     for res in results:
         print(res)
@@ -178,12 +184,16 @@ def opti_dnn():
 
 if __name__== '__main__':
     # import the dnn
-    import_dnn("dnns/flowNetS.txt")
-
+    import_dnn("dnns/GC_net.txt")
+    for ln in dnn3d:
+        print(ln)
+    # exit()
     # check which characterization you want to proceed
     if detail_profile:
         # set up the hardware configuration
         setup_hardware(hardware_constraints())
+        # set up the hardware configuration
+        setup_hardware3d(hardware_constraints())
         # start the optimization main routine
         res = opti_dnn()
         # plot the result of each layer

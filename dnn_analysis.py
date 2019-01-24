@@ -15,21 +15,21 @@ def plot_util_dnn(res, suffix):
     # initialize the array from the result first.
     sa_util = []
     buf_util = []
-    comp_bound = {'x':[], 'y': []}
-    mem_bound = {'x':[], 'y': []}
+    # comp_bound = {'x':[], 'y': []}
+    # mem_bound = {'x':[], 'y': []}
     cnt = 1
 
     # the content in the result is listed as:
     for item in res:
         sa_util.append(item[2])
         buf_util.append(item[3])
-        if item[-1] == 'C':
-            comp_bound['x'].append(cnt)
-            comp_bound['y'].append(item[2]*item[3])
-        else:
-            mem_bound['x'].append(cnt)
-            mem_bound['y'].append(item[2]*item[3])
-        cnt += 1
+        # if item[-1] == 'C':
+        #     comp_bound['x'].append(cnt)
+        #     comp_bound['y'].append(item[2]*item[3])
+        # else:
+        #     mem_bound['x'].append(cnt)
+        #     mem_bound['y'].append(item[2]*item[3])
+        # cnt += 1
 
     x_axis_ls = range(1, len(res)+1)
     plt.rc('font', size=10)
@@ -47,28 +47,30 @@ def plot_util_dnn(res, suffix):
     p2 = ax2.plot(x_axis_ls, buf_util, color='#FFBF56', linestyle=':', linewidth=2, \
                     marker='o',markersize=8, markeredgewidth=1.5, markeredgecolor='k');
 
-    p3 = ax1.bar(comp_bound['x'], comp_bound['y'], 0.5, align='center',color='#8154D1',\
-        edgecolor=['k']*len(x_axis_ls), linewidth=1.5, hatch="/");
+    # p3 = ax1.bar(comp_bound['x'], comp_bound['y'], 0.5, align='center',color='#8154D1',\
+    #     edgecolor=['k']*len(x_axis_ls), linewidth=1.5, hatch="/");
     
-    p4 = ax2.bar(mem_bound['x'], mem_bound['y'], 0.5, align='center', \
-        color='#5b87f2', edgecolor=['k']*len(x_axis_ls), linewidth=1.5, hatch="\\");
-    plt.subplots_adjust(left=0.1, bottom=0.25, right=0.9, top=0.9,
-                wspace=0.2, hspace=0.2)
+    # p4 = ax2.bar(mem_bound['x'], mem_bound['y'], 0.5, align='center', \
+    #     color='#5b87f2', edgecolor=['k']*len(x_axis_ls), linewidth=1.5, hatch="\\");
+    # plt.subplots_adjust(left=0.1, bottom=0.25, right=0.9, top=0.9,
+    #             wspace=0.2, hspace=0.2)
     plt.xticks(x_axis_ls, [ "Layer" + str(n) for n in x_axis_ls])
-    ax2.set_ylim(0.0, 1.0)
     ax1.set_ylim(0.0, 1.0)
+    ax2.set_ylim(0.0, 1.0)
     ax1.tick_params(axis="y",direction="in")
     ax2.tick_params(axis="y",direction="in")
     ax1.tick_params(axis="x",direction="in")
     plt.grid(color='grey', which='major', axis='y', linestyle='--')
     ax1.yaxis.set_major_formatter(FuncFormatter(lambda y, _: '{:.0%}'.format(y))) 
     ax2.yaxis.set_major_formatter(FuncFormatter(lambda y, _: '{:.0%}'.format(y))) 
-    plt.legend((p1[0], p2[0], p3[0], p4[0]), ('SA util', 'Buf util',\
-                'Comp-bound', 'Mem-bound'), bbox_to_anchor=(0., 1.01, 1., .101), loc=3,
+    plt.legend((p1[0], p2[0]), ('SA util', 'Buf util',),\
+     bbox_to_anchor=(0., 1.01, 1., .101), loc=3,
            ncol=4, mode="expand", borderaxespad=0., frameon=False)
     ax1.set_axisbelow(True)
     
     plt.savefig(suffix+"_layer_util.pdf");
+    print(sa_util)
+    print(buf_util)
 
 
 def profile_layer_cycle(res, suffix):
@@ -78,8 +80,8 @@ def profile_layer_cycle(res, suffix):
 
     # the content in the result is listed as:
     for item in res:
-        total_transfer.append(np.log(item[0]))
-        total_cycle.append(np.log(item[1]))
+        total_transfer.append(item[0])
+        total_cycle.append(item[1])
 
     x_axis_ls = range(1, len(res)+1)
     plt.rc('font', size=10)
@@ -98,8 +100,10 @@ def profile_layer_cycle(res, suffix):
                     marker='o',markersize=8, markeredgewidth=1.5, markeredgecolor='k');
     plt.subplots_adjust(left=0.1, bottom=0.25, right=0.9, top=0.9,
                 wspace=0.2, hspace=0.2)
-    ax1.set_ylim(13.0, 17.0)
-    ax2.set_ylim(11.0, 17.0)
+    ax1.set_ylim(pow(10, 6), pow(10, 8))
+    ax2.set_ylim(pow(10, 6), pow(10, 8))
+    ax1.set_yscale('log')
+    ax2.set_yscale('log')
     plt.xticks(x_axis_ls, [ "Layer" + str(n) for n in x_axis_ls])
     ax1.tick_params(axis="y",direction="in")
     ax2.tick_params(axis="y",direction="in")
@@ -111,6 +115,9 @@ def profile_layer_cycle(res, suffix):
     ax1.set_axisbelow(True)
     
     plt.savefig(suffix+"_layer_cycle.pdf");
+    print(total_transfer)
+    print(total_cycle)
+
 
 
 '''
