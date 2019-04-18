@@ -4,78 +4,32 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.ticker import FuncFormatter
 import numpy as np
-import scipy;
+import scipy
+import sys
 
-# if profile in details for one particular network.
-detail_profile = True
-
-# if it is static schedule the buffer 
-static_schedule = True
-
-# set the switch whether we want to split the Deconv
-enable_split = True
-
-# if we combine two different sub-kernels and optimize them 
-# together, then, enable this switch
-enable_combine = False
-
-# add suffix to every plot for one configuration profiling
-suffix = "split"
 
 # import my own modules
 from dnn_analysis import *
+import layer_static, layer_optimizer
 
-# depends on scheduling, imports different optimizer
-if static_schedule:
-    from layer_static import optimize, setup_hardware
-else:
-    from layer_optimizer import optimize, setup_hardware
-
-# a list to store the dnn configuration 
-dnn = []
+enable = {
+    "combine" : False,
+    "split" : False,
+}
 
 # a list to store all the optimization results
 results = []
 
-# import dnn network descrtiption into the system;
-# the format for one DNN layer is: 
-# (width, height, in_channel, out_channel,
-#  kenrel_width, kernel_height, stride, Deconv?)
-def import_dnn(filename=None):
-    # clear all the previous contents;
-    del dnn[:]
-    ifmap_dim = [960, 576, 6]
-    weight_dim = []
+def setup(meta_data, hardware_constraints):
+    global enable
 
-    # The weight input format as follows: 
-    # [out_channel,kenrel_width,kernel_height,stride,Deconv?]
-    for line in open(filename):
-        ls = line.strip().split(",")
-        weight_dim.append([int(ls[0]), int(ls[1]), int(ls[2]),\
-                             int(ls[3]), ls[4] == 'True'])
+    if meta_data["schedule"]["static"]:
+        layer_static.setup_hardware(hardware_constraints)
+    else:
+        layer_optimizer.setup_hardware(hardware_constraints)
 
-    for w in weight_dim:
-        # first append the necessary information to compute this Conv layer 
-        dnn.append(list(ifmap_dim+w))
-        # if it is Deconv;
-        if w[-1]:
-            # increase the deconv ofmap by two, as default,
-            # we only consider stride fo 2
-            ifmap_dim = [ifmap_dim[0]*2, ifmap_dim[1]*2, w[0]]
-        else: 
-            # if it is Conv, scale down the ifmap dimemsion by stride;
-            ifmap_dim = [ifmap_dim[0]/w[-2], ifmap_dim[1]/w[-2], w[0]]
-
-
-# The hardware constraints are:
-#   1. the on-chip buffer size; 
-#   2. the memory bandwidth; (Unit in bytes/cycle) 
-#   3. the systolic array size;
-def hardware_constraints(sa_size=24.0, mem_bw=3.0, buf=2097152.0):
-    systolic_arr_size = sa_size;
-    memory_bandwidth = mem_bw;
-    buffer_size = buf;
-    return [systolic_arr_size, memory_bandwidth, buffer_size]
+    enable["combine"] = meta_data["schedule"]["combine"]
+    enable["split"] = meta_data["schedule"]["split"]
 
 
 def opti_deconv(layer):
@@ -83,57 +37,58 @@ def opti_deconv(layer):
     subs = []
 
     # if the convolution size is odd;
-    if layer[5]%2 == 1:
-        sub1 = list(layer)
-        sub1[4] = (sub1[4]+1)/2
-        sub1[5] = (sub1[5]+1)/2
-        # set sub_res1 == None
-        sub_res1 = None
+    if layer["kernel"][0]%2 == 1:
+        sub1 = dict(layer)
+        sub1["kernel"][0] = (sub1["kernel"][0]+1)/2
+        sub1["kernel"][1] = (sub1["kernel"][1]+1)/2
+        sub2 = dict(layer)
+        sub2["kernel"][0] = (sub2["kernel"][0]+1)/2
+        sub2["kernel"][1] = (sub2["kernel"][1]-1)/2
+        sub3 = dict(layer)
+        sub3["kernel"][0] = (sub3["kernel"][0]-1)/2
+        sub3["kernel"][1] = (sub3["kernel"][1]+1)/2
+        sub4 = dict(layer)
+        sub4["kernel"][0] = (sub4["kernel"][0]-1)/2
+        sub4["kernel"][1] = (sub4["kernel"][1]-1)/2
+        
         if enable_combine:
-            sub1[3] = sub1[3]*2
-            subs.append(optimize(sub1))
+            subs.append(optimize(layer))
         else:
             res1 = optimize(sub1)
-            res1[0] = res1[0]*2
-            res1[1] = res1[1]*2
             subs.append(res1)
-
-        # handle the second sub-kernel    
-        sub2 = list(layer)
-        sub2[4] = (sub2[4]-1)/2
-        sub2[5] = (sub2[5]-1)/2
-        if enable_combine:
-            sub2[3] = sub2[3]*2
-            subs.append(optimize(sub2))
-        else:
             res2 = optimize(sub2)
-            res2[0] = res2[0]*2
-            res2[1] = res2[1]*2
             subs.append(res2)
+            res3 = optimize(sub3)
+            subs.append(res3)
+            res4 = optimize(sub4)
+            subs.append(res4)
 
     # if the convolution size is even;
     else:
-        sub = list(layer)
-        sub[4] = sub[4]/2
-        sub[5] = sub[5]/2
+        sub = dict(layer)
+        sub["kernel"][0] = sub["kernel"][0]/2
+        sub["kernel"][1] = sub["kernel"][1]/2
         if enable_combine:
             # this will consider four same-size sub-kernels 
             # as one sub-kernel with more channels
-            sub[3] = sub[3]*4
+            sub["out_channel"] = sub["out_channel"]*4
             subs.append(optimize(sub))
         else:
             # without combining sub-kernels 
             res = optimize(sub)
             # times 4 of each individual sub-kernel's
             # memory traffic and cycles.
-            res[0] = res[0]*4
-            res[1] = res[1]*4
+            res["total_traffic"] = res["total_traffic"]*4
+            res["total_cycle"] = res["total_cycle"]*4
             subs.append(res)
 
     ret = [0, 0, 0, 0]
+    print(subs)
     for item in subs:
         ret = [x+y for x,y in zip(ret,item)]
 
+    # this is used to divide the length of the subs-kernel
+    # to get the utilization of SA ans buf.
     ret[2] /= len(subs)
     ret[3] /= len(subs)
     results.append(ret)
@@ -141,62 +96,43 @@ def opti_deconv(layer):
     return ret
 
 # the main routine of optimizing the dnn.
-def opti_dnn():
-    global results
-    # clear the result first
-    del results[:]
+def opti_dnn(meta_data, hardware_constraints):
+    # set up the configurations;
+    setup(meta_data, hardware_constraints)
+    dnn = meta_data["dnn"]
+
+    results = []
 
     # optimize for each layer
-    for layer in dnn:
+    for i in range(len(dnn)):
+        layer = dnn[i]
         print("[Layer]",layer)
 
         # check if this layer is Deconv, True == YES
-        if layer[-1] == True:
-            if enable_split:
+        if layer["Deconv?"] == True:
+            if enable["split"]:
                 # if split the deconv into smaller ones
                 opti_deconv(layer)
             else:
                 # start to optimize ordinary Conv layer.
-                tmp = list(layer)
-                # scale down the ifmap to the ifmap based on the stride size.
-                tmp[0] = layer[0]*2
-                tmp[1] = layer[1]*2
+                data = dict(layer)
+                # scale up the ifmap to the ifmap based on the stride size.
+                tmp[0] = layer["ifmap"][0]*2
+                tmp[1] = layer["ifmap"][1]*2
                 results.append(optimize(tmp))
         else:
             # start to optimize ordinary Conv layer.
-            tmp = list(layer)
+            data = dict(layer)
+            data["ofmap"] = [0,0]
             # scale down the ifmap to the ifmap based on the stride size.
-            tmp[0] = layer[0]/layer[-2]
-            tmp[1] = layer[1]/layer[-2]
+            data["ofmap"][0] = layer["ifmap"][0]/layer["stride"]
+            data["ofmap"][1] = layer["ifmap"][1]/layer["stride"]
             results.append(optimize(tmp))
+
+        # append last result into meta_data
+        meta_data["dnn"][i]["result"] = result[-1]
 
     for res in results:
         print(res)
 
     return results
-
-
-if __name__== '__main__':
-    # import the dnn
-    import_dnn("dnns/flowNetS.txt")
-
-    # check which characterization you want to proceed
-    if detail_profile:
-        # set up the hardware configuration
-        setup_hardware(hardware_constraints())
-        # start the optimization main routine
-        res = opti_dnn()
-        # plot the result of each layer
-        plot_util_dnn(res, suffix)
-        profile_layer_cycle(res, suffix)
-    else:
-        # profile systolic array size impacts
-        profile_sa_size(8, 36, 4)
-        # profile bandwidth impacts
-        profile_bw_size(-3, 8)
-        # profile buffer size impacts
-        profile_buf_size(1, 10)
-
-
-
-

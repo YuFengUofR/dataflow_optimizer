@@ -4,21 +4,20 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.ticker import FuncFormatter
 import numpy as np
-import scipy
-import sys
+import scipy;
 
 # if profile in details for one particular network.
-detail_profile = False
+detail_profile = True
 
 # if it is static schedule the buffer 
-static_schedule = True
+static_schedule = False
 
 # set the switch whether we want to split the Deconv
-enable_split = False
+enable_split = True
 
 # if we combine two different sub-kernels and optimize them 
 # together, then, enable this switch
-enable_combine = False
+enable_combine = True
 
 # add suffix to every plot for one configuration profiling
 suffix = "tmp"
@@ -45,15 +44,15 @@ results = []
 
 # import dnn network descrtiption into the system;
 # the format for one DNN layer is: 
-# (width, height, disparity, in_channel, out_channel,
-#  kenrel_width, kernel_height, kernel_disp, stride, Deconv?)
+# (width, height, in_channel, out_channel,
+#  kenrel_width, kernel_height, stride, Deconv?)
 def import_dnn(filename=None):
     # clear all the previous contents;
     del dnn[:]
     switch = False
     ifmap_dim = [960, 576, 6]
-    ifmap3d_dim = [480, 288, 96, 64]  # this is for GC_Net
-    # ifmap3d_dim = [240, 144, 48, 64]    # this is for PSMNet
+    # ifmap3d_dim = [480, 288, 96, 64]  # this is for GC_Net
+    ifmap3d_dim = [240, 144, 48, 64]    # this is for PSMNet
     weight_dim = []
     weight3d_dim = []
 
@@ -101,7 +100,7 @@ def import_dnn(filename=None):
 #   1. the on-chip buffer size; 
 #   2. the memory bandwidth; (Unit in bytes/cycle) 
 #   3. the systolic array size; 8388608.0
-def hardware_constraints(sa_size=16.0, mem_bw=32.0, buf=1048576.0*1.5):
+def hardware_constraints(sa_size=16.0, mem_bw=16.0, buf=1048576.0):
     systolic_arr_size = sa_size;
     memory_bandwidth = mem_bw;
     buffer_size = buf;
@@ -116,26 +115,34 @@ def opti_deconv3d(layer):
     sub_shape = [[2,2,2], [2,2,1], [2,1,1], [1,1,1]]
     # In our case, we only handle 3x3x3 Deconv, 
     # although, we can generalize into other cases;
-    for i in range(4):
-        sub = list(layer)
-        # change the kernel shape
-        sub[5:8] = sub_shape[i]
-        # check if we want to combine sub-kernels;
-        if enable_combine:
-            sub[4] = sub[4]*num[i]
-            subs.append(optimize3d(sub))
-        else:
+
+    # check if we want to combine sub-kernels;
+    if enable_combine:
+
+        for i in range(4):
+            sub = list(layer)
+            # change the kernel shape
+            sub[5:8] = sub_shape[i]
+        sub[4] = sub[4]*num[i]
+        subs.append(sub)
+        ret = optimize_deconv3d(subs)
+    else:
+        for i in range(4):
+            sub = list(layer)
+            # change the kernel shape
+            sub[5:8] = sub_shape[i]
+
             res = optimize3d(sub)
             res[0] = res[0]*num[i]
             res[1] = res[1]*num[i]
             subs.append(res)
 
-    ret = [0, 0, 0, 0]
-    for item in subs:
-        print("[sub-kernel]",item)
-        ret = [x+y for x,y in zip(ret,item)]
-    ret[2] /= len(subs)
-    ret[3] /= len(subs)
+        ret = [0, 0, 0, 0]
+        for item in subs:
+            print("[sub-kernel]",item)
+            ret = [x+y for x,y in zip(ret,item)]
+        ret[2] /= len(subs)
+        ret[3] /= len(subs)
     
     # sum all the results
     return ret
@@ -216,7 +223,6 @@ def opti_dnn():
     if opti_3d != None:
         results = results + opti_3d
 
-    prev = None
     for res in results:
         print(res)
 
@@ -228,34 +234,36 @@ The functions below are to profile the impacts of different bandwidth,
 buffer size, and systolic array size on overall system.
 '''
 def profile_sa_size(low, high, step):
-    for scale in range(1, 7):
-        arr = []
-        # systolic_arr_size, memory_bandwidth, buffer_size
-        for size in range(low, high+step, step):
-            config = hardware_constraints(sa_size=16.0, mem_bw=32.0, buf=1048576.0*0.5*scale)
-            print("SIZE", size)
-            config[0] = float(size)
-            print(config)
-            setup_hardware(config)
-            setup_hardware3d(config)
-            res = opti_dnn()
-            arr.append([item[0:4] for item in res])
+    arr = []
+    # systolic_arr_size, memory_bandwidth, buffer_size
+    for size in range(low, high+step, step):
+        config = hardware_constraints()
+        print("SIZE", size)
+        config[0] = float(size)
+        print(config)
+        setup_hardware(config)
+        setup_hardware3d(config)
+        res = opti_dnn()
+        for j in range(len(res)):
+            if res[j] is None:
+                res[j] = arr[-1][j]
+        arr.append([item[0:4] for item in res])
 
-        # gather results
-        res = {"sa_avg":[], "sa_std":[], "buf_avg":[], "buf_std":[], \
-                "cycle_avg": [], "traffic_avg": []}
+    # gather results
+    res = {"sa_avg":[], "sa_std":[], "buf_avg":[], "buf_std":[], \
+            "cycle_avg": [], "traffic_avg": []}
 
-        for ls in arr:
-            res["sa_avg"].append(np.mean([i[2] for i in ls]))
-            res["sa_std"].append(np.std([i[2] for i in ls]))
-            res["buf_avg"].append(np.mean([i[3] for i in ls]))
-            res["buf_std"].append(np.std([i[3] for i in ls]))
-            res["cycle_avg"].append(np.mean([i[1] for i in ls]))
-            res["traffic_avg"].append(np.mean([i[0] for i in ls]))
-        # print >> sys.stderr, ('[%d]' % (scale))
-        print >> sys.stderr, str(res["traffic_avg"])
-    # plot_sa_size(res, low, high, step)
-    # plot_sa_cycle(res, low, high, step)
+    for ls in arr:
+        res["sa_avg"].append(np.mean([i[2] for i in ls]))
+        res["sa_std"].append(np.std([i[2] for i in ls]))
+        res["buf_avg"].append(np.mean([i[3] for i in ls]))
+        res["buf_std"].append(np.std([i[3] for i in ls]))
+        res["cycle_avg"].append(np.mean([i[1] for i in ls]))
+        res["traffic_avg"].append(np.mean([i[0] for i in ls]))
+
+    print(res)
+    plot_sa_size(res, low, high, step)
+    plot_sa_cycle(res, low, high, step)
 
 def profile_bw_size(low, high):
     arr = []
@@ -266,6 +274,9 @@ def profile_bw_size(low, high):
         setup_hardware(config)
         setup_hardware3d(config)
         res = opti_dnn()
+        for j in range(len(res)):
+            if res[j] is None:
+                res[j] = arr[-1][j]
         arr.append([item[0:4] for item in res])
 
     # gather results
@@ -286,11 +297,11 @@ def profile_bw_size(low, high):
 def profile_buf_size(low, high, step, scale):
     arr = []
     # systolic_arr_size, memory_bandwidth, buffer_size
-    for size in [0.25, 0.5, 1, 1.5, 2.0, 3.0, 6.0]:
+    for size in range(low, high, step):
         config = hardware_constraints()
         # print(config[2]*pow(1.2, size)/3.0)
-        config[2] = config[2]*size
-        # config[2] = config[2]*scale*pow(1.2, size)
+        # config[2] = config[2]*scale*size
+        config[2] = config[2]*scale*pow(1.2, size)
         setup_hardware(config)
         setup_hardware3d(config)
         res = opti_dnn()
@@ -309,14 +320,14 @@ def profile_buf_size(low, high, step, scale):
         res["traffic_avg"].append(np.mean([i[0] for i in ls]))
 
     print(res)
-    # plot_buf_size(res, [0.25, 0.5, 1, 1.5, 2.0, 3.0, 6.0], 1)
-    plot_buf_cycle(res, [0.25, 0.5, 1, 1.5, 2.0, 3.0, 6.0], 1)
+    plot_buf_size(res, low, high, step, 1, scale)
+    plot_buf_cycle(res, low, high, step, 1, scale)
 
 
 if __name__== '__main__':
     # import the dnn
-    import_dnn("dnns/GC_Net.txt")
-    # import_dnn("dnns/PSMNet.txt")
+    # import_dnn("dnns/GC_Net.txt")
+    import_dnn("dnns/PSMNet.txt")
     for ln in dnn3d:
         print(ln)
     # exit()
@@ -333,12 +344,12 @@ if __name__== '__main__':
         profile_layer_cycle(res, suffix)
     else:
         # profile systolic array size impacts
-        profile_sa_size(8, 64, 8)
+        # profile_sa_size(8, 96, 8)
         # profile bandwidth impacts
         # profile_bw_size(-5, 12)
         # profile buffer size impacts
-        # profile_buf_size(10, 200, 10, 0.01)
-        # profile_buf_size(3, 20, 2, 0.1)
+        profile_buf_size(1, 12, 1, 0.1)
+        # profile_buf_size(4, 25, 1, 0.01)
 
 
 

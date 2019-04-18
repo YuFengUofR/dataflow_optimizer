@@ -25,11 +25,12 @@ Co = 512.0      # channels for ofmap
 B = 16.0/4
 
 # on-chip buffer size
+buffer_size = 1.0*1024.0*1024.0
+
+# on-chip buffer partition
 bufi_size = 0.3*1024.0*1024.0
 bufo_size = 0.3*1024.0*1024.0
 bufw_size = 0.4*1024.0*1024.0
-
-buffer_size = 1.0*1024.0*1024.0
 
 # array to store the result from the four different results
 res = []
@@ -58,15 +59,20 @@ def buffer_utilization(x):
 
 # set up hardware configuration
 def setup_hardware3d(config):
-    global A, B, buffer_size
+    global A, B, buffer_size, bufi_size, bufo_size, bufw_size
     A = config[0]
     B = config[1]/4.0
     buffer_size = config[2]
+    bufi_size = config[3]*buffer_size
+    bufo_size = config[4]*buffer_size
+    bufw_size = config[5]*buffer_size
+    print("#CONFIG#",config)
 
 def process_parameter(x, row_major, comp_bound):
     global res
     x = list(map(lambda i: math.floor(i), x))
     bound = "C"
+    print(x)
     # make the tile size even for every batch
     c_0 = Co/math.ceil(Co/x[0])
     w_0 = W/math.ceil(W/x[1])
@@ -105,7 +111,8 @@ def process_parameter(x, row_major, comp_bound):
     # print(x[0],(math.ceil(x[0]/A)*A), x[1]*x[2], (math.ceil(x[1]*x[2]/A)*A))
     print("total_transfer", total_transfer, "total_cycle", total_cycle, \
         "systolic_array_utilization", util_sys_arr, "buffer_utilization", util_buf)
-    res.append([total_transfer, total_cycle, util_sys_arr, util_buf, Co/c_0, W/w_0, H/h_0, D/d_0, bound])
+    res.append([round(total_transfer, 0), round(total_cycle,0), util_sys_arr, util_buf, \
+                [c_0, w_0, h_0, d_0], Co/c_0, W/w_0, H/h_0, D/d_0, bound])
     return
 
 # the main optimization of compute-bound and row-major case;
@@ -113,7 +120,7 @@ def opti_buffer():
     # set the initial guess;
     x0 = [A, A]
     # first, let's find the number of kernel we can put into buffer.
-    while (x0[0]+A)*K_h*K_w*Ci < bufw_size:
+    while (x0[0]+A)*K_h*K_w*K_d*Ci < bufw_size:
         x0[0] = x0[0]+A
     # set to be less than or equal to number of kernels
     x0[0] = min(x0[0], Co)
@@ -123,10 +130,11 @@ def opti_buffer():
         x0[1] = x0[1]+A
 
     # no need to optimize the buffer for ofmap, because it is
-    # bounded ifmap.
-    x = [x0[0], min(math.sqrt(x0[1]), W), min(math.sqrt(x0[1]), H), 1]
+    # bounded to ifmap.
+    x = [x0[0], min(math.floor(math.sqrt(x0[1])), W), \
+            min(math.floor(math.sqrt(x0[1])), H), 1]
     # set 
-    x[-1] = min(math.ceil(x0[1]/(x[1]*x[2])), D)
+    x[-1] = min(math.floor(x0[1]/(x[1]*x[2])), D)
 
     process_parameter(x, False, False)
     process_parameter(x, False, True)
@@ -135,7 +143,7 @@ def opti_buffer():
 
 # optimize one layer
 def optimize3d(layer_info):
-    global H, W, Ci, Co, K_w, K_h, S
+    global W, H, D, Ci, Co, K_w, K_h, K_d, S
     del res[:]
     for item in layer_info[:6]:
         if item % 1 != 0:

@@ -23,11 +23,11 @@ Co = 512.0      # channels for ofmap
 B = 16.0/4
 
 # on-chip buffer size
-bufi_size = 0.3*1024.0*1024.0
-bufo_size = 0.3*1024.0*1024.0
-bufw_size = 0.4*1024.0*1024.0
+bufi_size = 0.3*1024.0*1024.0*2/4
+bufo_size = 0.3*1024.0*1024.0*2/4
+bufw_size = 0.4*1024.0*1024.0*2/4
 
-buffer_size = 1.0*1024.0*1024.0
+buffer_size = 2.0*1024.0*1024.0/4.0
 
 # array to store the result from the four different results
 res = []
@@ -61,7 +61,6 @@ def setup_hardware(config):
     A = config[0]
     B = config[1]/4.0
     buffer_size = config[2]
-
     # on-chip buffer partition
     bufi_size = 0.3*buffer_size
     bufo_size = 0.3*buffer_size
@@ -109,10 +108,12 @@ def process_parameter(x, row_major, comp_bound):
         "systolic_array_utilization", util_sys_arr, "buffer_utilization", util_buf)
     res.append([int(total_transfer), int(total_cycle), util_sys_arr, util_buf,\
          x, Co/c_0, W/w_0, H/h_0, bound])
+
     return
 
 # the main optimization of compute-bound and row-major case;
 def opti_buffer():
+    global A, B, buffer_size, bufi_size, bufo_size, bufw_size
     # set the initial guess;
     x0 = [A, A]
     # first, let's find the number of kernel we can put into buffer.
@@ -131,6 +132,133 @@ def opti_buffer():
     process_parameter(x, False, True)
     process_parameter(x, True, False)
     process_parameter(x, True, True)
+
+
+# the main optimization of compute-bound and row-major case;
+# subs <- a list of (width(0), height(1), in_channel(2), out_channel(3),
+#                   kenrel_width(4), kernel_height(5), stride(6), Deconv?(7))
+def opti_deconv_buffer(subs):
+    global A, B, buffer_size, bufi_size, bufo_size, bufw_size
+    # record the remaining number of out_channels
+    num_subs = list([sub[3] for sub in subs])
+
+    # set the initial guess;
+    Area = A
+    # next let's see how much ifmap can we fit into the buffer.
+    while S*S*(Area+A)*Ci < bufi_size and Area < W*H:
+        Area += A
+
+    w_0 = W/math.ceil(W/min(math.sqrt(Area), W))
+    h_0 = H/math.ceil(H/min(math.sqrt(Area), H))
+    # print("[AERA]", Area, w_0, h_0)
+
+    curr_bufw = 1.0
+
+    # the data needed to load for ifmap, consider stride 1
+    total_transfer = 0 # (h_0+2)*(w_0+2)*Ci
+    total_cycle = 0.0
+
+    cnt_round = 0
+    buf_util = []
+    while curr_bufw > 0.0:
+        # print("[round]", cnt_round)
+        cnt_round += 1
+        inx = 0
+        curr_bufw = 0.0
+        curr_bufo = 0.0
+        cnt_arr = []
+        for sub in subs:
+            cnt = 0
+            # first, let's find the number of kernel we can put into buffer.
+            while (curr_bufw + A*sub[4]*sub[5]*Ci) < bufw_size \
+                                                and cnt < num_subs[inx]:
+                # add additional weight into current weight buffer
+                curr_bufw += A*sub[4]*sub[5]*Ci
+                # add additional output into current output buffer
+                curr_bufo += w_0*h_0*A
+                # add additional computation
+                total_cycle += sub[4]*sub[5]*Ci*math.ceil(w_0*h_0/A)
+                # 
+                cnt += A
+
+            # update the index and cnt_arr
+            inx += 1
+            cnt_arr.append(cnt)
+
+        # subtract the value out of num_subs
+        num_subs = np.subtract(num_subs, cnt_arr)
+        # end of the loop, check cnt_arr value
+        # print("sub_arr", cnt_arr, "num_subs", num_subs)
+        # add additional data transfer
+        if curr_bufo == 0:
+            break
+        total_transfer += (curr_bufw + curr_bufo)
+        # print("bufo util", curr_bufo/bufo_size, "bufw util", curr_bufw/bufw_size)
+        buf_util.append((curr_bufw + curr_bufo + (h_0+2)*(w_0+2)*Ci)/buffer_size)
+
+    if total_transfer/B > total_cycle:
+        total_cycle = total_transfer/B
+    
+
+    batch = math.ceil(W/w_0*H/h_0)
+
+    for val in num_subs:
+        if val > 0:
+            return [total_transfer*batch, total_cycle*batch, 0, 0, False]
+
+    # utilizaition of systolic array
+    total_comp = 0
+    for sub in subs:
+        total_comp += sub[4]*sub[5]*Ci*W*H*Co
+
+    util_sys_arr = total_comp/(total_cycle*A*A*batch)
+
+    util_buf = 0
+    if len(buf_util) != 0:
+        util_buf = np.mean(buf_util)
+
+    # check whether row-major is benefitial or channel-major
+    if total_transfer < H*W*Ci:
+        return [round(total_transfer*batch+H*W*Ci,1), round(total_cycle*batch,1), \
+            util_sys_arr, util_buf, True]
+    else:
+        return [round(total_transfer+H*W*Ci*batch,1), round(total_cycle*batch,1), \
+            util_sys_arr, util_buf, True]
+
+
+# optimize deconv layer
+def optimize_deconv(subs):
+    global H, W, Ci, Co, K_w, K_h, S, buffer_size, \
+            bufi_size, bufo_size, bufw_size
+
+    # set up the new layer information
+
+    for i in range(4):
+        (W, H, Ci, Co, K_w, K_h, S, _) = subs[i]
+        # print("##[LAYER%d]##" % (i), W, H, Ci, Co, K_w, K_h)
+
+    best_res = None
+    for i in range(1, 50):
+        # set up the configuration
+        bufi_size = buffer_size*(1.0*i/100.0)
+        bufo_size = buffer_size*(1.0*i/100.0)
+        bufw_size = buffer_size*((100.0-2.0*i)/100.0)
+        # print("bufo_size", bufo_size, "bufw_size", bufw_size, "bufi_size", bufi_size)
+        # both cases are possible;
+        res = opti_deconv_buffer(subs)
+
+        if best_res is None:
+            best_res = list(res[0:4])
+        elif res[4] and best_res[1] > res[1]:
+                best_res = list(res[0:4])
+        elif res[4] and best_res[1] == res[1] and best_res[0] > res[0]:
+                best_res = list(res[0:4])
+
+        # print(res)
+
+    print("[Best]", best_res)
+    return best_res
+
 
 # optimize one layer
 def optimize(layer_info):
@@ -172,3 +300,4 @@ def optimize(layer_info):
         ret = channel_major_res
 
     return ret
+

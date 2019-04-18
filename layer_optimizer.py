@@ -31,7 +31,7 @@ buffer_size = 1.0*1024.0*1024.0
 # threshold for bounds
 # if the constraint result is negative but within this threshold,
 # it is still consider a valid result.
-Threshold = 10.0
+Threshold = 500.0
 
 # array to store the result from the four different results
 res = []
@@ -156,7 +156,7 @@ def row_major_mem_bound_constraint(x):
 # the main optimization of memory-bound and row-major case; 
 def opti_mem_row_major():
     # set the initial guess;
-    x0 = [A, math.sqrt(A), math.sqrt(A)]
+    x0 = [min(A, Co), min(math.floor(math.sqrt(A)), H), min(math.floor(math.sqrt(A)), W)]
     # for row_major_constraint1
     con1 = {'type': 'ineq', 'fun': row_major_constraint}
     # for mem_bound_constraint
@@ -166,7 +166,8 @@ def opti_mem_row_major():
     con4 = {'type': 'ineq', 'fun': buffer_constraint2}
 
     # summery all the bounds and constraints
-    bnds = ((A, Co), (math.sqrt(A), H), (math.sqrt(A), W))
+    bnds = ((min(A, Co), Co), (min(math.floor(math.sqrt(A)), H), H), \
+            (min(math.floor(math.sqrt(A)), W), W))
     cons= ([con1, con2, con3, con4])
 
     # call the external solver to solve the solution
@@ -209,7 +210,7 @@ def row_major_comp_bound_constraint(x):
 # the main optimization of compute-bound and row-major case;
 def opti_comp_row_major():
     # set the initial guess;
-    x0 = [A, math.sqrt(A), math.sqrt(A)]
+    x0 = [min(A, Co), min(math.floor(math.sqrt(A)), H), min(math.floor(math.sqrt(A)), W)]
     # for row_major_constraint1
     con1 = {'type': 'ineq', 'fun': row_major_constraint}
     # for mem_bound_constraint
@@ -219,7 +220,8 @@ def opti_comp_row_major():
     con4 = {'type': 'ineq', 'fun': buffer_constraint2}
 
     # summery all the bounds and constraints
-    bnds = ((A, Co), (math.sqrt(A), H), (math.sqrt(A), W))
+    bnds = ((min(A, Co), Co), (min(math.floor(math.sqrt(A)), H), H), \
+            (min(math.floor(math.sqrt(A)), W), W))
     cons= ([con1, con2, con3, con4])
 
     # call the external solver to solve the solution
@@ -235,7 +237,7 @@ def opti_comp_row_major():
         passed = False
         print("row major constraint", row_major_constraint(solution.x), "NOT PASSED.")
     if passed and buffer_constraint2(solution.x) < -Threshold:
-        passed = False
+        # passed = False
         print("buffer size", buffer_constraint1(solution.x), "is OVER limit!")
     if passed and row_major_comp_bound_constraint(solution.x) < -Threshold:
         passed = False
@@ -281,7 +283,7 @@ def channel_major_mem_bound_constraint(x):
 # the main optimization of memory-bound and channel-major case;
 def opti_mem_channel_major():
     # set the initial guess;
-    x0 = [A, math.sqrt(A), math.sqrt(A)]
+    x0 = [min(A, Co), min(math.floor(math.sqrt(A)), H), min(math.floor(math.sqrt(A)), W)]
     # for row_major_constraint1
     con1 = {'type': 'ineq', 'fun': channel_major_constraint}
     # for mem_bound_constraint
@@ -291,7 +293,8 @@ def opti_mem_channel_major():
     con4 = {'type': 'ineq', 'fun': buffer_constraint2}
 
     # summery all the bounds and constraints
-    bnds = ((A, Co), (math.sqrt(A), H), (math.sqrt(A), W))
+    bnds = ((min(A, Co), Co), (min(math.floor(math.sqrt(A)), H), H), \
+            (min(math.floor(math.sqrt(A)), W), W))
     cons= ([con1, con2, con3, con4])
 
     # call the external solver to solve the solution
@@ -331,7 +334,7 @@ def channel_major_comp_bound_constraint(x):
 # the main optimization of compute-bound and channel-major case;
 def opti_comp_channel_major():
     # set the initial guess;
-    x0 = [A, math.sqrt(A), math.sqrt(A)]
+    x0 = [min(A, Co), min(math.floor(math.sqrt(A)), H), min(math.floor(math.sqrt(A)), W)]
     # for row_major_constraint1
     con1 = {'type': 'ineq', 'fun': channel_major_constraint}
     # for mem_bound_constraint
@@ -341,7 +344,8 @@ def opti_comp_channel_major():
     con4 = {'type': 'ineq', 'fun': buffer_constraint2}
 
     # summery all the bounds and constraints
-    bnds = ((A, Co), (math.sqrt(A), H), (math.sqrt(A), W))
+    bnds = ((min(A, Co), Co), (min(math.floor(math.sqrt(A)), H), H), \
+            (min(math.floor(math.sqrt(A)), W), W))
     cons= ([con1, con2, con3, con4])
 
     # call the external solver to solve the solution
@@ -357,7 +361,7 @@ def opti_comp_channel_major():
         passed = False
         print("channel major constraint", channel_major_constraint(solution.x), "NOT PASSED.")
     if passed and buffer_constraint2(solution.x) < -Threshold:
-        passed = False
+        # passed = False
         print("buffer size", buffer_constraint1(solution.x), "is OVER limit!")
     if passed and channel_major_comp_bound_constraint(solution.x) < -Threshold:
         passed = False
@@ -400,8 +404,11 @@ def optimize(layer_info):
     print("##[LAYER]##", W, H, Ci, Co, K_w, K_h)
     
     # both cases are possible;
-    opti_mem()
+    # opti_mem()
     opti_comp()
+
+    if len(res) == 0:
+        opti_mem()
 
     if len(res) == 0:
         return None
@@ -410,6 +417,8 @@ def optimize(layer_info):
 
     for item in res:
         if ret[1] > item[1]:
+            ret = list(item)
+        if ret[1] == item[1] and ret[0] > item[0]:
             ret = list(item)
 
     return ret

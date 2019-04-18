@@ -25,7 +25,7 @@ Ci = 128.0      # channels for weights
 Co = 128.0      # channels for ofmap
 
 # memory bandwith number of bytes can be transferred.
-B = 4.0/4
+B = 26.0/4
 
 # on-chip buffer size
 buffer_size = 1.0*1024.0*1024.0
@@ -92,7 +92,8 @@ def process_parameter(x, row_major, comp_bound):
         "systolic_array_utilization", util_sys_arr, "buffer_utilization", util_buf)
     res.append([int(total_transfer), int(total_cycle), util_sys_arr, \
                 util_buf, x, Co/c_0, W/w_0, H/h_0, D/d_0, bound])
-    return
+    return [int(total_transfer), int(total_cycle), util_sys_arr, \
+                util_buf, x, Co/c_0, W/w_0, H/h_0, D/d_0, bound]
 
 ###############################################################
 #                     general constraints                     #
@@ -155,7 +156,10 @@ def opti_mem_row_major():
     con4 = {'type': 'ineq', 'fun': buffer_constraint2}
 
     # summery all the bounds and constraints
-    bnds = ((A, Co), (math.sqrt(A), H), (math.sqrt(A), W), (1, D))
+    print((min(A, Co), Co), (min(math.floor(math.sqrt(A)), H), H), \
+            (min(math.floor(math.sqrt(A)), W), W), (1, D))
+    bnds = ((min(A, Co), Co), (min(math.floor(math.sqrt(A)), H), H), \
+            (min(math.floor(math.sqrt(A)), W), W), (1, D))
     cons= ([con1, con2, con3, con4])
 
     # call the external solver to solve the solution
@@ -171,7 +175,7 @@ def opti_mem_row_major():
         passed = False
         print("row major constraint", row_major_constraint(solution.x), "NOT PASSED.")
     if passed and buffer_constraint2(solution.x) < -Threshold:
-        passed = False
+        # passed = False
         print("buffer size", buffer_constraint1(solution.x), "is OVER limit!")
         # print("buffer constraint", buffer_constraint2(solution.x))
     if passed and row_major_mem_bound_constraint(solution.x) < -Threshold:
@@ -181,7 +185,7 @@ def opti_mem_row_major():
     
     if passed:
         print("Row-major memory-bound case PASSED!")
-        process_parameter(solution.x, True, False)
+        return process_parameter(solution.x, True, False)
     else:
         return None
 
@@ -197,7 +201,7 @@ def row_major_comp_bound_constraint(x):
 # the main optimization of compute-bound and row-major case;
 def opti_comp_row_major():
     # set the initial guess;
-    x0 = [A, math.sqrt(A), math.sqrt(A), 1]
+    x0 = [min(A, Co), math.floor(math.sqrt(A)), math.floor(math.sqrt(A)), 1]
     # for row_major_constraint1
     con1 = {'type': 'ineq', 'fun': row_major_constraint}
     # for mem_bound_constraint
@@ -207,7 +211,10 @@ def opti_comp_row_major():
     con4 = {'type': 'ineq', 'fun': buffer_constraint2}
 
     # summery all the bounds and constraints
-    bnds = ((A, Co), (math.sqrt(A), H), (math.sqrt(A), W), (1, D))
+    print((min(A, Co), Co), (min(math.floor(math.sqrt(A)), H), H), \
+            (min(math.floor(math.sqrt(A)), W), W), (1, D))
+    bnds = ((min(A, Co), Co), (min(math.floor(math.sqrt(A)), H), H), \
+            (min(math.floor(math.sqrt(A)), W), W), (1, D))
     cons= ([con1, con2, con3, con4])
 
     # call the external solver to solve the solution
@@ -223,7 +230,7 @@ def opti_comp_row_major():
         passed = False
         print("row major constraint", row_major_constraint(solution.x), "NOT PASSED.")
     if passed and buffer_constraint2(solution.x) < -Threshold:
-        passed = False
+        # passed = False
         print("buffer size", buffer_constraint1(solution.x), "is OVER limit!")
     if passed and row_major_comp_bound_constraint(solution.x) < -Threshold:
         passed = False
@@ -232,7 +239,7 @@ def opti_comp_row_major():
 
     if passed:
         print("Row-major compute-bound case PASSED!")
-        process_parameter(solution.x, True, True)
+        return process_parameter(solution.x, True, True)
     else:
         return None
 
@@ -279,7 +286,10 @@ def opti_mem_channel_major():
     con4 = {'type': 'ineq', 'fun': buffer_constraint2}
 
     # summery all the bounds and constraints
-    bnds = ((A, Co), (math.sqrt(A), H), (math.sqrt(A), W), (1, D))
+    print((min(A, Co), Co), (min(math.floor(math.sqrt(A)), H), H), \
+            (min(math.floor(math.sqrt(A)), W), W), (1, D))
+    bnds = ((min(A, Co), Co), (min(math.floor(math.sqrt(A)), H), H), \
+            (min(math.floor(math.sqrt(A)), W), W), (1, D))
     cons= ([con1, con2, con3, con4])
 
     # call the external solver to solve the solution
@@ -295,7 +305,7 @@ def opti_mem_channel_major():
         passed = False
         print("channel major constraint", channel_major_constraint(solution.x), "NOT PASSED.")
     if passed and buffer_constraint2(solution.x) < -Threshold:
-        passed = False
+        # passed = False
         print("buffer size", buffer_constraint1(solution.x), "is OVER limit!")
     if passed and channel_major_mem_bound_constraint(solution.x) < -Threshold:
         passed = False
@@ -304,7 +314,7 @@ def opti_mem_channel_major():
 
     if passed:
         print("Channel-major memory-bound case PASSED!")
-        process_parameter(solution.x, False, False)
+        return process_parameter(solution.x, False, False)
     else:
         return None
 
@@ -329,7 +339,10 @@ def opti_comp_channel_major():
     con4 = {'type': 'ineq', 'fun': buffer_constraint2}
 
     # summery all the bounds and constraints
-    bnds = ((A, Co), (math.sqrt(A), H), (math.sqrt(A), W), (1, D))
+    print((min(A, Co), Co), (min(math.floor(math.sqrt(A)), H), H), \
+            (min(math.floor(math.sqrt(A)), W), W), (1, D))
+    bnds = ((min(A, Co), Co), (min(math.floor(math.sqrt(A)), H), H), \
+            (min(math.floor(math.sqrt(A)), W), W), (1, D))
     cons= ([con1, con2, con3, con4])
 
     # call the external solver to solve the solution
@@ -345,7 +358,7 @@ def opti_comp_channel_major():
         passed = False
         print("channel major constraint", channel_major_constraint(solution.x), "NOT PASSED.")
     if passed and buffer_constraint2(solution.x) < -Threshold:
-        passed = False
+        # passed = False
         print("buffer size", buffer_constraint1(solution.x), "is OVER limit!")
     if passed and channel_major_comp_bound_constraint(solution.x) < -Threshold:
         passed = False
@@ -354,7 +367,7 @@ def opti_comp_channel_major():
 
     if passed:
         print("Channel-major compute-bound case PASSED!")
-        process_parameter(solution.x, False, True)
+        return process_parameter(solution.x, False, True)
     else:
         return None
 
@@ -362,19 +375,26 @@ def opti_comp_channel_major():
 def opti_mem():
     print("=========================  Memory Bound  ==========================")
     # optimization for row-major;
-    opti_mem_row_major();
+    ret1 = opti_mem_row_major();
     # optimization for channel-major;
-    opti_mem_channel_major();
+    ret2 = opti_mem_channel_major();
     print("\n")
+    if ret1 == None and ret2 == None:
+        return False
+    else:
+        return True
 
 def opti_comp():
     print("=========================  Compute Bound  =========================")
     # optimization for row-major;
-    opti_comp_row_major();
+    ret1 = opti_comp_row_major();
     # optimization for channel-major;
-    opti_comp_channel_major();
+    ret2 = opti_comp_channel_major();
     print("\n")
-
+    if ret1 == None and ret2 == None:
+        return False
+    else:
+        return True
 
 def optimize3d(layer_info=None):
     global H, W, D, Ci, Co, K_w, K_h, K_d, S
@@ -384,13 +404,15 @@ def optimize3d(layer_info=None):
             print("one input layer variable is not integer.")
             exit()
     # set up the new layer information
-    print(layer_info)
     (W, H, D, Ci, Co, K_w, K_h, K_d, S, _) = layer_info
     print("##[LAYER]##", W, H, D, Ci, Co, K_w, K_h, K_d)
     
     # both cases are possible;
-    opti_mem()
-    opti_comp()
+    # opti_mem()
+    ret = opti_comp()
+
+    if ret is False:
+        opti_mem()
 
     if len(res) == 0:
         return None
@@ -399,6 +421,8 @@ def optimize3d(layer_info=None):
 
     for item in res:
         if ret[1] > item[1]:
+            ret = list(item)
+        if ret[1] == item[1] and ret[0] > item[0]:
             ret = list(item)
 
     return ret
