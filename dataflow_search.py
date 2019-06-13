@@ -3,10 +3,11 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.ticker import FuncFormatter
+import argparse
 import numpy as np
 import scipy
 import sys
-
+import pprint
 
 # import my own modules
 import dnn_optimizer as opt
@@ -26,28 +27,31 @@ argparser.add_argument('--combine', type=bool, default=False,
                         help="enable to combine the sub-kernels durting compute")
 argparser.add_argument('--model_type', default='2D', choices=['2D', '3D'],
                         help='DNN model convolution type: 2D or 3D.')
-argparser.add_argument('--Search_methods', default='Constraint', choices=['Constraint', 'Exhaustive'],
+argparser.add_argument('--ifmap', nargs="+", type=int, required=True, 
+                        help="the ifmap dimemsion, order: [W H C] or [W H D C]")
+argparser.add_argument('--search_methods', default='Constraint', choices=['Constraint', 'Exhaustive'],
                     help='Dataflow search methods: constraint optoimization or exhaustive search.')
 
 # other hardware configurations
 argparser.add_argument('--bufsize', type=float, default=1048576.0*1.5, 
-                        help="in Btyes", required=True)
+                        help="in Btyes")
 argparser.add_argument('--memory_bandwidth', type=float, default=6.4*4,
-                        help="in GB/s", required=True)
+                        help="in GB/s")
 argparser.add_argument('--sa_size', type=float, default=16, 
-                        help="Systolic array size", required=True)
+                        help="Systolic array size")
 argparser.add_argument('--bit_width', type=float, default=16, 
-                        help="Bit Width", required=True)
+                        help="Bit Width of each value (typically, 8-bit, 16-bit, 32-bit)")
 
+
+args = argparser.parse_args()
 
 # import dnn network descrtiption into the system;
 # the format for one DNN layer is: 
 # (width, height, in_channel, out_channel,
 #  kenrel_width, kernel_height, stride, Deconv?)
-def import_dnn(filename=None):
+def import_dnn(filename, ifmap_dim):
     # a list to store the dnn configuration 
     dnn = []
-    ifmap_dim = [960, 576, 6]
     weight_dim = []
 
     # The weight input format as follows: 
@@ -62,8 +66,8 @@ def import_dnn(filename=None):
         dnn.append({"ifmap": ifmap_dim,
                     "out_channel": w[0],
                     "kernel": w[1:3],
-                    "stride": w[3]},
-                    "Deconv?": w[-1])
+                    "stride": w[3],
+                    "Deconv?": w[-1]})
 
         # if it is Deconv;
         if w[-1]:
@@ -81,7 +85,7 @@ def import_dnn(filename=None):
 #   1. the on-chip buffer size; 
 #   2. the memory bandwidth; (Unit in bytes/cycle) 
 #   3. the systolic array size;
-def hardware_constraints(sa_size=24.0, mem_bw=32.0, buf=1048576.0*2.0):
+def hardware_constraints(sa_size=24.0, mem_bw=32.0, buf=1048576.0*2.0, bit_width=16.0):
     systolic_arr_size = sa_size;
     memory_bandwidth = mem_bw;
     buffer_size = buf;
@@ -92,7 +96,7 @@ def system_config(args, meta_data):
     meta_data["schedule"] = {}
     meta_data["schedule"]["static"] = args.static
     meta_data["schedule"]["split"] = args.split
-    meta_data["schedule"]["combine"] = args.compute
+    meta_data["schedule"]["combine"] = args.combine
 
     # setup the system;
     meta_data["system_info"] = {}
@@ -111,11 +115,13 @@ if __name__== '__main__':
     meta_data = system_config(args, meta_data)
 
     # import the dnn
-    dnn = import_dnn(args.dnnfile)
+    dnn = import_dnn(args.dnnfile, args.ifmap)
     meta_data["dnn"] = dnn
     hw_constraints = hardware_constraints(sa_size=args.sa_size,
-             mem_bw=args.memory_bandwidth, buf=args.bufsize)
+             mem_bw=args.memory_bandwidth, buf=args.bufsize, bit_width=args.bit_width)
 
     # start the optimization main routine
     res = opt.opti_dnn(meta_data, hw_constraints)
+
+    pprint.pprint(meta_data)
 

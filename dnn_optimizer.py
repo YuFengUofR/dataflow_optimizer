@@ -52,15 +52,15 @@ def opti_deconv(layer):
         sub4["kernel"][1] = (sub4["kernel"][1]-1)/2
         
         if enable_combine:
-            subs.append(optimize(layer))
+            subs.append(layer_optimizer.optimize(layer))
         else:
-            res1 = optimize(sub1)
+            res1 = layer_optimizer.optimize(sub1)
             subs.append(res1)
-            res2 = optimize(sub2)
+            res2 = layer_optimizer.optimize(sub2)
             subs.append(res2)
-            res3 = optimize(sub3)
+            res3 = layer_optimizer.optimize(sub3)
             subs.append(res3)
-            res4 = optimize(sub4)
+            res4 = layer_optimizer.optimize(sub4)
             subs.append(res4)
 
     # if the convolution size is even;
@@ -72,10 +72,10 @@ def opti_deconv(layer):
             # this will consider four same-size sub-kernels 
             # as one sub-kernel with more channels
             sub["out_channel"] = sub["out_channel"]*4
-            subs.append(optimize(sub))
+            subs.append(layer_optimizer.optimize(sub))
         else:
             # without combining sub-kernels 
-            res = optimize(sub)
+            res = layer_optimizer.optimize(sub)
             # times 4 of each individual sub-kernel's
             # memory traffic and cycles.
             res["total_traffic"] = res["total_traffic"]*4
@@ -83,7 +83,6 @@ def opti_deconv(layer):
             subs.append(res)
 
     ret = [0, 0, 0, 0]
-    print(subs)
     for item in subs:
         ret = [x+y for x,y in zip(ret,item)]
 
@@ -106,20 +105,25 @@ def opti_dnn(meta_data, hardware_constraints):
     # optimize for each layer
     for i in range(len(dnn)):
         layer = dnn[i]
-        print("[Layer]",layer)
 
         # check if this layer is Deconv, True == YES
         if layer["Deconv?"] == True:
             if enable["split"]:
                 # if split the deconv into smaller ones
-                opti_deconv(layer)
+                results.append({
+                        "data" : data,
+                        "result" :opti_deconv(layer)
+                        })
             else:
                 # start to optimize ordinary Conv layer.
                 data = dict(layer)
                 # scale up the ifmap to the ifmap based on the stride size.
-                tmp[0] = layer["ifmap"][0]*2
-                tmp[1] = layer["ifmap"][1]*2
-                results.append(optimize(tmp))
+                data["ifmap"][0] = layer["ifmap"][0]*2/layer["stride"]
+                data["ifmap"][1] = layer["ifmap"][1]*2/layer["stride"]
+                results.append({
+                        "data" : data,
+                        "result" :layer_optimizer.LayerOptimizer(data).optimize()
+                        })
         else:
             # start to optimize ordinary Conv layer.
             data = dict(layer)
@@ -127,12 +131,13 @@ def opti_dnn(meta_data, hardware_constraints):
             # scale down the ifmap to the ifmap based on the stride size.
             data["ofmap"][0] = layer["ifmap"][0]/layer["stride"]
             data["ofmap"][1] = layer["ifmap"][1]/layer["stride"]
-            results.append(optimize(tmp))
+
+            results.append({
+                        "data" : data,
+                        "result" :layer_optimizer.LayerOptimizer(data).optimize()
+                        })
 
         # append last result into meta_data
-        meta_data["dnn"][i]["result"] = result[-1]
-
-    for res in results:
-        print(res)
+        meta_data["dnn"][i]["result"] = results[-1]
 
     return results
