@@ -5,55 +5,18 @@ import math
 import numpy as np
 from scipy.optimize import minimize
 
-# info for systolic array
-SysArr = 16.0      # systolic array dimension
-
-# memory bandwith number of bytes can be transferred.
-Bandwith = 16.0/4
-
-# on-chip buffer size
-BufferSize = 1.0*1024.0*1024.0
+# my own module
+from layer_base_method import *
 
 # threshold for bounds
 # if the constraint result is negative but within this threshold,
 # it is still consider a valid result.
 Threshold = 500.0
 
-class LayerOptimizer(object):
-
-    # info for systolic array
-    A = 16.0      # systolic array dimension
-
-    # memory bandwith number of bytes can be transferred.
-    B = 4.0/4
-
-    # on-chip buffer size
-    buffer_size = 1.0*1024.0*1024.0
-    # info for weights
-    K_w = 3.0       # kernel width
-    K_h = 3.0       # kernel height
-    S = 1.0         # stride size
-
-    # input layer dimension
-    H = 512.0        # height of ofmap
-    W = 512.0        # width of ifmap
-    Ci = 512.0      # channels for weights
-    Co = 512.0      # channels for ofmap
-
-
-    # array to store the result from the four different results
-    res = []
-
-
+class LayerOptimizer(LayerBaseMethod):
     """docstring for LayerOptimizer"""
     def __init__(self, data):
-        global SysArr, Bandwith, BufferSize
-        self.data = data
-        self.A = SysArr
-        self.B = Bandwith
-        self.buffer_size = BufferSize
-        self.res = []
-
+        super(LayerOptimizer, self).__init__(data)
 
     # variables for optimization
     # this two has been encodes as x[3] = {c_0, h_0, w_0};
@@ -71,59 +34,53 @@ class LayerOptimizer(object):
     #                       general process                       #
     ###############################################################
 
-    def process_parameter(self, x, row_major, comp_bound):
-        bound = "C"
-        # make the tile size even for every batch
-        c_0 = self.Co/math.ceil(self.Co/round(x[0]))
-        w_0 = self.W/math.ceil(self.W/round(x[1]))
-        h_0 = self.H/math.ceil(self.H/round(x[2]))
-        # check the result
-        # print(c_0, w_0, h_0, self.Co/c_0, self.W/w_0, self.H/h_0)
-        # compute the total number of elements needed to be updated 
-        # if it is row-major.
-        if row_major:
-            # (ofmap + ifmap)*total_batch + (ofmap+weights)*Co/c_0
-            total_transfer = (h_0*w_0*c_0+(self.S*h_0+2)*(self.S*w_0+2)*self.Ci)* \
-                            (self.H*self.W*self.Co/(h_0*w_0*c_0)-self.Co/c_0) \
-                                +(h_0*w_0*c_0+self.K_h*self.K_w*self.Ci*c_0)*self.Co/c_0
-        # compute the total number of elements needed to be updated 
-        # if it is channel-major.
-        else:
-            # (ofmap + weights)*total_batch + (ofmap+ifmap)*(H*W)/(h_0*w_0)
-            total_transfer = (h_0*w_0*c_0+self.K_h*self.K_w*self.Ci*c_0)* \
-                            (self.H*self.W*self.Co/(h_0*w_0*c_0)-self.H*self.W/(h_0*w_0)) \
-                                +(h_0*w_0*c_0+(self.S*h_0+2)*(self.S*w_0+2)*self.Ci)*self.H*self.W/(h_0*w_0)
+    def optimize(self):
+        self.res = []
+        layer_info = self.data
+        # set up the new layer information
+        [self.W, self.H, self.Ci] = layer_info["ifmap"]
+        self.Co = layer_info["out_channel"]
+        [self.K_w, self.K_h] = layer_info["kernel"]
+        self.S = layer_info["stride"]
 
+        # print("##[LAYER]##", self.W, self.H, self.Ci, self.Co, self.K_w, self.K_h)
+        
+        # both cases are possible;
+        # opti_mem()
+        self.opti_comp()
 
-        # compute the utilization of systolic array
-        util_sys_arr = x[0]/(math.ceil(round(x[0]/self.A, 1))*self.A) \
-                            * x[1]*x[2]/(math.ceil(round(x[1]*x[2]/self.A, 1))*self.A)
+        if len(self.res) == 0:
+            self.opti_mem()
 
-        # compute the utilization of systolic array
-        util_buf = self.buffer_constraint1([c_0, w_0, h_0])/self.buffer_size
-        # calculate the amount of cycles of computing all elements.
-        if comp_bound:
-            bound = "C"
-            total_cycle = (self.H*self.W*self.Co)*(self.Ci*self.K_h*self.K_w)/(self.A*self.A)/util_sys_arr 
-        else:
-            bound = "M"
-            total_cycle = total_transfer/self.B
+        if len(self.res) == 0:
+            return None
 
-        # print(x[0],(math.ceil(x[0]/A)*A), x[1]*x[2], (math.ceil(x[1]*x[2]/A)*A))
-        # print("total_transfer", total_transfer, "total_cycle", total_cycle, \
-        #     "systolic_array_utilization", util_sys_arr, "buffer_utilization", util_buf)
-        ret = {
-            "total_transfer": total_transfer,
-            "total_cycle": total_cycle, 
-            "systolic_array_utilization": util_sys_arr,
-            "buffer_utilization": util_buf,
-            "c_0, w_0, h_0": [c_0, w_0, h_0],
-            "Tile size" : [self.Co/c_0, self.W/w_0, self.H/h_0],
-            "Bound" : bound
-        }
-        self.res.append(ret)
-        return
+        ret  = dict(self.res[0])
 
+        for item in self.res:
+            if ret["total_cycle"] > item["total_cycle"]:
+                ret = dict(item)
+            if ret["total_cycle"] == item["total_cycle"] and \
+                ret["total_transfer"] > item["total_transfer"]:
+                ret = dict(item)
+
+        return ret
+
+    def opti_mem(self):
+        # print("=========================  Memory Bound  ==========================")
+        # optimization for row-major;
+        self.opti_mem_row_major();
+        # optimization for channel-major;
+        self.opti_mem_channel_major();
+        # print("\n")
+
+    def opti_comp(self):
+        # print("=========================  Compute Bound  =========================")
+        # optimization for row-major;
+        self.opti_comp_row_major();
+        # optimization for channel-major;
+        self.opti_comp_channel_major();
+        # print("\n")
 
     # the main optimization of memory-bound and row-major case; 
     def opti_mem_row_major(self):
@@ -309,54 +266,6 @@ class LayerOptimizer(object):
             return None
 
 
-    def opti_mem(self):
-        # print("=========================  Memory Bound  ==========================")
-        # optimization for row-major;
-        self.opti_mem_row_major();
-        # optimization for channel-major;
-        self.opti_mem_channel_major();
-        # print("\n")
-
-    def opti_comp(self):
-        # print("=========================  Compute Bound  =========================")
-        # optimization for row-major;
-        self.opti_comp_row_major();
-        # optimization for channel-major;
-        self.opti_comp_channel_major();
-        # print("\n")
-
-
-    def optimize(self):
-        self.res = []
-        layer_info = self.data
-        # set up the new layer information
-        [self.W, self.H, self.Ci] = layer_info["ifmap"]
-        self.Co = layer_info["out_channel"]
-        [self.K_w, self.K_h] = layer_info["kernel"]
-        self.S = layer_info["stride"]
-
-        # print("##[LAYER]##", self.W, self.H, self.Ci, self.Co, self.K_w, self.K_h)
-        
-        # both cases are possible;
-        # opti_mem()
-        self.opti_comp()
-
-        if len(self.res) == 0:
-            self.opti_mem()
-
-        if len(self.res) == 0:
-            return None
-
-        ret  = dict(self.res[0])
-
-        for item in self.res:
-            if ret["total_cycle"] > item["total_cycle"]:
-                ret = dict(item)
-            if ret["total_cycle"] == item["total_cycle"] and ret["total_transfer"] > item["total_transfer"]:
-                ret = dict(item)
-
-        return ret
-
 
     ###############################################################
     #                     general constraints                     #
@@ -449,7 +358,8 @@ class LayerOptimizer(object):
     # c_0*(h_0*w_0+K^2*C)/B >= (K^2*C/A^2)*c_0*(h_0*w_0)
     # range : [0, +inf]
     def channel_major_mem_bound_constraint(self, x):
-        return (x[1]*x[2]+self.K_h*self.K_w*self.Ci)/self.B - self.K_h*self.K_w*self.Ci/(self.A*self.A)*x[1]*x[2]
+        return (x[1]*x[2]+self.K_h*self.K_w*self.Ci)/self.B \
+        - self.K_h*self.K_w*self.Ci/(self.A*self.A)*x[1]*x[2]
 
     # make sure the process is always memory-bound;
     # which is the latency for memory access is always 
@@ -457,14 +367,9 @@ class LayerOptimizer(object):
     # c_0*(h_0*w_0+K^2*C)/B >= (K^2*C/A^2)*c_0*(h_0*w_0) 
     # range : [0, +inf]
     def channel_major_comp_bound_constraint(self, x):
-        return self.K_h*self.K_w*self.Co/(self.A*self.A)*x[1]*x[2] - (x[1]*x[2]+self.K_h*self.K_w*self.Co)/self.B
+        return self.K_h*self.K_w*self.Co/(self.A*self.A)*x[1]*x[2] \
+        - (x[1]*x[2]+self.K_h*self.K_w*self.Co)/self.B
 
 
-
-def setup_hardware(config):
-    global SysArr, Bandwith, BufferSize
-    SysArr = config[0]
-    Bandwith = config[1]/4.0
-    BufferSize = config[2]
 
 

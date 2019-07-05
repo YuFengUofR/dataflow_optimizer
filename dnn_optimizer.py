@@ -10,57 +10,75 @@ import sys
 
 # import my own modules
 from dnn_analysis import *
-import layer_static, layer_optimizer
+import layer_optimizer
+import layer_exhaustive_searcher
 
+method = None
 enable = {
     "combine" : False,
     "split" : False,
 }
 
-# a list to store all the optimization results
-results = []
-
 def setup(meta_data, hardware_constraints):
-    global enable
+    global enable, method
+    # define the search method
+    method = meta_data["method"]
 
     if meta_data["schedule"]["static"]:
-        layer_static.setup_hardware(hardware_constraints)
+        raise Exception("The static scheduling is not supported"
+            " in constrained optimizer.")
     else:
-        layer_optimizer.setup_hardware(hardware_constraints)
+        setup_hardware(hardware_constraints)
 
     enable["combine"] = meta_data["schedule"]["combine"]
     enable["split"] = meta_data["schedule"]["split"]
 
+def setup_hardware(hardware_constraints):
+    global method
 
-def opti_deconv(layer):
+    if method == "Constrained":
+        layer_optimizer.setup_hardware(hardware_constraints)
+    elif method == "Exhaustive":
+        layer_exhaustive_searcher.setup_hardware(hardware_constraints)
+    else:
+        raise Exception("Unknown search method: {}".format(method))
+    
+def single_layer_optimization(data):
+    if method == "Constrained":
+        return layer_optimizer.LayerOptimizer(data).optimize()
+    elif method == "Exhaustive":
+        return layer_exhaustive_searcher.LayerExhaustiveSearcher(data).optimize()
+    else:
+        raise Exception("Unknown search method: {}".format(method))
+
+
+def opti_deconv(layer, method):
     # collect individual result from sub_kernels
     subs = []
 
     # if the convolution size is odd;
     if layer["kernel"][0]%2 == 1:
+        add_one = [(i+1)/2 for i in layer["kernel"]]
+        sub_one = [(i-1)/2 for i in layer["kernel"]]
         sub1 = dict(layer)
-        sub1["kernel"][0] = (sub1["kernel"][0]+1)/2
-        sub1["kernel"][1] = (sub1["kernel"][1]+1)/2
+        sub1["kernel"] = [add_one[0], add_one[1]]
         sub2 = dict(layer)
-        sub2["kernel"][0] = (sub2["kernel"][0]+1)/2
-        sub2["kernel"][1] = (sub2["kernel"][1]-1)/2
+        sub2["kernel"] = [add_one[0], sub_one[1]]
         sub3 = dict(layer)
-        sub3["kernel"][0] = (sub3["kernel"][0]-1)/2
-        sub3["kernel"][1] = (sub3["kernel"][1]+1)/2
+        sub3["kernel"] = [sub_one[0], add_one[1]]
         sub4 = dict(layer)
-        sub4["kernel"][0] = (sub4["kernel"][0]-1)/2
-        sub4["kernel"][1] = (sub4["kernel"][1]-1)/2
+        sub4["kernel"] = [sub_one[0], sub_one[1]]
         
         if enable_combine:
-            subs.append(layer_optimizer.optimize(layer))
+            subs.append(single_layer_optimization(layer, method))
         else:
-            res1 = layer_optimizer.optimize(sub1)
+            res1 = single_layer_optimization(sub1, method)
             subs.append(res1)
-            res2 = layer_optimizer.optimize(sub2)
+            res2 = single_layer_optimization(sub2, method)
             subs.append(res2)
-            res3 = layer_optimizer.optimize(sub3)
+            res3 = single_layer_optimization(sub3, method)
             subs.append(res3)
-            res4 = layer_optimizer.optimize(sub4)
+            res4 = single_layer_optimization(sub4, method)
             subs.append(res4)
 
     # if the convolution size is even;
@@ -72,27 +90,17 @@ def opti_deconv(layer):
             # this will consider four same-size sub-kernels 
             # as one sub-kernel with more channels
             sub["out_channel"] = sub["out_channel"]*4
-            subs.append(layer_optimizer.optimize(sub))
+            subs.append(single_layer_optimization(sub4, method))
         else:
             # without combining sub-kernels 
-            res = layer_optimizer.optimize(sub)
-            # times 4 of each individual sub-kernel's
+            res = single_layer_optimization(sub, method)
+            # times 4 of each individual sub-kernel"s
             # memory traffic and cycles.
             res["total_traffic"] = res["total_traffic"]*4
             res["total_cycle"] = res["total_cycle"]*4
             subs.append(res)
 
-    ret = [0, 0, 0, 0]
-    for item in subs:
-        ret = [x+y for x,y in zip(ret,item)]
-
-    # this is used to divide the length of the subs-kernel
-    # to get the utilization of SA ans buf.
-    ret[2] /= len(subs)
-    ret[3] /= len(subs)
-    results.append(ret)
-    # sum all the results
-    return ret
+    return subs
 
 # the main routine of optimizing the dnn.
 def opti_dnn(meta_data, hardware_constraints):
@@ -122,7 +130,7 @@ def opti_dnn(meta_data, hardware_constraints):
                 data["ifmap"][1] = layer["ifmap"][1]*2/layer["stride"]
                 results.append({
                         "data" : data,
-                        "result" :layer_optimizer.LayerOptimizer(data).optimize()
+                        "result" : single_layer_optimization(data)
                         })
         else:
             # start to optimize ordinary Conv layer.
@@ -134,7 +142,7 @@ def opti_dnn(meta_data, hardware_constraints):
 
             results.append({
                         "data" : data,
-                        "result" :layer_optimizer.LayerOptimizer(data).optimize()
+                        "result" : single_layer_optimization(data)
                         })
 
         # append last result into meta_data
