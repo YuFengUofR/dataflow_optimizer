@@ -72,6 +72,8 @@ class LayerExhaustiveSearcher(LayerBaseMethod):
                 # we should skip it.
                 if (self.bufi_size + self.bufw_size) > BufferSize:
                     continue
+
+                self.bufo_size = BufferSize - self.bufi_size - self.bufw_size
                 # both cases are possible;
                 self.opti_buffer()
 
