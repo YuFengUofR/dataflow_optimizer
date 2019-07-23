@@ -17,17 +17,17 @@ The goal of this optimizer are followings:
 ## What's inside
 
 There are two main parts in this framework:
-  1. The overall framework to drive different optimizers.
+1. The overall framework to drive different optimizers.
 
-    * `dnn_optimizer.py`
-    * `dataflow_search.py`
+* `dnn_optimizer.py`
+* `dataflow_search.py`
 
-  2. The layer-level optimizers to optimize different
-  
-    * `layer_base_method.py`
-    * `layer_optimizer.py`
-    * `layer_exhaustive_searcher.py`
-    * `deconv_exhaustive_searcher.py`
+2. The layer-level optimizers to optimize different
+
+* `layer_base_method.py`
+* `layer_optimizer.py`
+* `layer_exhaustive_searcher.py`
+* `deconv_exhaustive_searcher.py`
 
 You can run the example dataflow optimization by `runner.sh`.
 
