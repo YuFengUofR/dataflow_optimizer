@@ -16,7 +16,7 @@ argparser.add_argument("--dnnfile", required=True)
 argparser.add_argument("--outfile", help="output file to dump all the results")
 
 # other search options
-argparser.add_argument("--static", type=bool, default=False, 
+argparser.add_argument("--static", type=bool, default=False,
                         help="static partition the buffer without dynamically changing")
 argparser.add_argument("--split", type=bool, default=False,
                         help="enable to split the convolution kernel into small sub-kernel")
@@ -24,44 +24,44 @@ argparser.add_argument("--combine", type=bool, default=False,
                         help="enable to combine the sub-kernels durting compute")
 argparser.add_argument("--model_type", default="2D", choices=["2D", "3D"],
                         help="DNN model convolution type: 2D or 3D.")
-argparser.add_argument("--ifmap", nargs="+", type=int, required=True, 
+argparser.add_argument("--ifmap", nargs="+", type=int, required=True,
                         help="the ifmap dimemsion, order: [W H C]")
-argparser.add_argument("--ifmap3d", nargs="+", type=int, required=False, 
+argparser.add_argument("--ifmap3d", nargs="+", type=int, required=False,
                         help="the ifmap dimemsion, order: [W H D C]")
-argparser.add_argument("--search_method", default="Constrained", 
+argparser.add_argument("--search_method", default="Constrained",
                         choices=["Constrained", "Exhaustive"],
                         help="Dataflow search methods: constraint optoimization"
                         " or exhaustive search.")
 
 # other hardware configurations
-argparser.add_argument("--bufsize", type=float, default=1048576.0*1.5, 
+argparser.add_argument("--bufsize", type=float, default=1048576.0*1.5,
                         help="in Btyes")
 argparser.add_argument("--memory_bandwidth", type=float, default=6.4*4,
                         help="in GB/s")
-argparser.add_argument("--sa_size", type=float, default=16, 
+argparser.add_argument("--sa_size", type=float, default=16,
                         help="Systolic array size")
-argparser.add_argument("--bit_width", type=float, default=16, 
+argparser.add_argument("--bit_width", type=float, default=16,
                         help="Bit Width of each value (typically, 8-bit, 16-bit, 32-bit)")
 
 
 args = argparser.parse_args()
 
 # import dnn network descrtiption into the system;
-# the format for one 2D DNN layer is: 
+# the format for one 2D DNN layer is:
 # (width, height, in_channel, out_channel,
 #  kenrel_width, kernel_height, stride, Deconv?)
-# 
+#
 # for 3D DNN layer is
 # (width, height, disparity, in_channel, out_channel,
 #  kenrel_width, kernel_height, kernel_disp, stride, Deconv?)
 def import_dnn(filename, ifmap_dim, ifmap3d_dim):
-    # a list to store the dnn configuration 
+    # a list to store the dnn configuration
     dnn = []
     weight_dim = []
 
     is_2d_layer = True
 
-    # The weight input format as follows: 
+    # The weight input format as follows:
     # [out_channel,kenrel_width,kernel_height,stride,Deconv?]
     for line in open(filename):
         if len(line) <= 1:

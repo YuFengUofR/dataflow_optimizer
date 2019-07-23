@@ -43,7 +43,7 @@ class DeconvExhaustiveSearcher(LayerBaseMethod):
                 continue
             # make the tile size even for every batch
             c_0 = min(self.Co/math.ceil(self.Co/round(x[i])), self.Co)
-            
+
             # check the result
             # print(c_0, w_0, h_0, self.Co/c_0, self.W/w_0, self.H/h_0)
             # compute the total number of elements needed to be updated 
@@ -54,7 +54,7 @@ class DeconvExhaustiveSearcher(LayerBaseMethod):
                                 +(h_0*w_0*c_0+self.Subs[i][0]*self.Subs[i][0]*self.Ci*c_0)
 
             # compute the utilization of systolic array
-            util_sys_arr = x[0]/(math.ceil(x[0]/self.A)*self.A) \
+            util_sys_arr = x[i]/(math.ceil(x[i]/self.A)*self.A) \
                                 *area[0]*area[1]/(math.ceil(area[0]*area[1]/self.A)*self.A)
 
             # # compute the utilization of systolic array
@@ -62,10 +62,10 @@ class DeconvExhaustiveSearcher(LayerBaseMethod):
 
             # if util_buf > 1.01:
             #     return (-1, -1)
-            
+
             comp_bound_cycle = (self.H*self.W*c_0)*(self.Ci*self.Subs[i][0]*self.Subs[i][0])\
-                                /(self.A*self.A)/util_sys_arr 
-            
+                                /(self.A*self.A)/util_sys_arr
+
             mem_bound_cycle = total_transfer/self.B
 
             total_cycle += max(comp_bound_cycle, mem_bound_cycle)
@@ -89,18 +89,20 @@ class DeconvExhaustiveSearcher(LayerBaseMethod):
 
     def fill_bufw(self, remain_subkernels):
         x0 = [0]*len(self.data["sub-kernels"])
+        sum_subs = 0
         for i in range(len(self.data["sub-kernels"])):
+            sub_size = self.Subs[i][0]*self.Subs[i][1]
             # first, let's find the number of kernel we can put into buffer.
-            while (x0[i]+self.A)*self.Subs[i][0]*self.Subs[i][1]*self.Ci < self.bufw_size \
+            while sum_subs < self.bufw_size \
                 and x0[i] < remain_subkernels[i]:
                 x0[i] = x0[i]+self.A
+                sum_subs += self.A*sub_size*self.Ci
 
         return x0
 
     # the main optimization routine;
     def opti_buffer(self):
-
-        # check if the initial configuration can hold the minimum requirements 
+        # check if the initial configuration can hold the minimum requirements
         if ((self.A*self.K_h*self.K_w*self.Ci > self.bufw_size) or
             (self.S*self.S*self.A*self.Ci > self.bufi_size)):
             return
@@ -109,7 +111,6 @@ class DeconvExhaustiveSearcher(LayerBaseMethod):
         total_transfer = 0
         remain_subkernels = [self.data["out_channel"]]*len(self.data["sub-kernels"])
 
-
         # set tile area;
         area = 0
         # next let's see how much ifmap can we fit into the buffer.
@@ -117,14 +118,10 @@ class DeconvExhaustiveSearcher(LayerBaseMethod):
             area = area+self.A
 
         round_result = []
-
+        result_cache = {}
         while not all([sub == 0 for sub in remain_subkernels]):
             # set the initial guess;
-            x0 = [0, 0, 0, 0]
-            print remain_subkernels
-
             x0 = self.fill_bufw(remain_subkernels)
-            print x0
 
             # no need to optimize the buffer for ofmap, because it is
             # bounded ifmap.
@@ -132,11 +129,14 @@ class DeconvExhaustiveSearcher(LayerBaseMethod):
 
             util_buf = self.buffer_utilization(x0, x1)/self.buffer_size
 
-            print(util_buf, x1)
+            # print(util_buf, x1, x0)
             if util_buf > 1.01:
                 return
 
-            (cycle, transfer) = self.process_parameter(x0, x1)
+            (cycle, transfer) = self.process_parameter(x0, x1) \
+                if str(x0 + x1) not in result_cache else result_cache[str(x0 + x1)]
+
+            result_cache[str(x0 + x1)] = (cycle, transfer)
 
             if cycle == -1 or transfer == -1:
                 return
@@ -145,7 +145,6 @@ class DeconvExhaustiveSearcher(LayerBaseMethod):
             total_cycle += cycle
 
             remain_subkernels = np.subtract(remain_subkernels, x0)
-
 
             round_result.append(x0)
 
@@ -182,7 +181,7 @@ class DeconvExhaustiveSearcher(LayerBaseMethod):
             [sub_one[0], sub_one[1]]]
 
         self.Subs = self.data["sub-kernels"]
-
+        
         # print("##[LAYER]##", self.W, self.H, self.Ci, self.Co, self.K_w, self.K_h)
 
         for i in range(1, 20):

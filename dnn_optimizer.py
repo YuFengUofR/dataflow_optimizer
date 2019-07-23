@@ -42,7 +42,7 @@ def setup_hardware(hardware_constraints):
         layer_exhaustive_searcher.setup_hardware(hardware_constraints)
     else:
         raise Exception("Unknown search method: {}".format(method))
-    
+
 def single_layer_optimization(data):
     global method
     if method == "Constrained":
@@ -79,7 +79,7 @@ def opti_deconv(layer):
         sub3["kernel"] = [sub_one[0], add_one[1]]
         sub4 = dict(layer)
         sub4["kernel"] = [sub_one[0], sub_one[1]]
-        
+
         if enable["combine"]:
             subs.append(single_combine_optimization(layer))
         else:
@@ -136,7 +136,6 @@ def opti_dnn(meta_data, hardware_constraints):
                         "result" :opti_deconv(layer)
                         })
             else:
-                
                 # scale up the ifmap to the ifmap based on the stride size.
                 data["ifmap"][0] = layer["ifmap"][0]*2/layer["stride"]
                 data["ifmap"][1] = layer["ifmap"][1]*2/layer["stride"]

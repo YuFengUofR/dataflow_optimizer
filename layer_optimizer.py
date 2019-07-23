@@ -44,7 +44,6 @@ class LayerOptimizer(LayerBaseMethod):
         self.S = layer_info["stride"]
 
         # print("##[LAYER]##", self.W, self.H, self.Ci, self.Co, self.K_w, self.K_h)
-        
         # both cases are possible;
         # opti_mem()
         self.opti_comp()
