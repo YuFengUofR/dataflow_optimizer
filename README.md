@@ -18,10 +18,12 @@ The goal of this optimizer are followings:
 
 There are two main parts in this framework:
   1. The overall framework to drive different optimizers.
+
     * `dnn_optimizer.py`
     * `dataflow_search.py`
 
   2. The layer-level optimizers to optimize different
+  
     * `layer_base_method.py`
     * `layer_optimizer.py`
     * `layer_exhaustive_searcher.py`
