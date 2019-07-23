@@ -81,7 +81,7 @@ class LayerOptimizer(LayerBaseMethod):
         self.opti_comp_channel_major();
         # print("\n")
 
-    # the main optimization of memory-bound and row-major case; 
+    # the main optimization of memory-bound and row-major case;
     def opti_mem_row_major(self):
         # set the initial guess;
         x0 = [min(self.A, self.Co), min(math.floor(math.sqrt(self.A)), self.H), \
@@ -125,9 +125,6 @@ class LayerOptimizer(LayerBaseMethod):
             self.process_parameter(solution.x, True, False)
         else:
             return None
-
-
-                    
 
     # the main optimization of compute-bound and row-major case;
     def opti_comp_row_major(self):

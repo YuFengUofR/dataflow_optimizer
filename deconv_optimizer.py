@@ -10,16 +10,15 @@ from layer_base_method import *
 ###############################################################
 #                       general process                       #
 ###############################################################
-class DeconvExhaustiveSearcher(LayerBaseMethod):
+class DeconvOptimizer(DeconvOptimizer):
 
     # array to store the result from the four different results
     rets = []
 
     """docstring for LayerExhaustiveSearcher"""
     def __init__(self, data):
-        super(DeconvExhaustiveSearcher, self).__init__(data)
+        super(DeconvOptimizer, self).__init__(data)
         self.rets = []
-
 
     # compute buffer utilization
     def buffer_utilization(self, x, area):
@@ -31,48 +30,10 @@ class DeconvExhaustiveSearcher(LayerBaseMethod):
 
         return total_buffer
 
-    # (ofmap + ifmap)*total_batch + (ofmap+weights)
-    def data_transfer(self, i, h_0, w_0, c_0):
-      # calculate the total batch
-      total_batch = self.Subs[i][0]*self.Subs[i][0]/(h_0*w_0)
-
-      # ofmap and ifmap tile size
-      ofmap_tile_size = h_0*w_0*c_0
-      ifmap_tile_size = (self.S*h_0+2)*(self.S*w_0+2)*self.Ci
-      # ofmap + ifmap transfer
-      total_transfer = (ofmap_tile_size + ifmap_tile_size) * total_batch
-
-      # weight tile size
-      kernel_tile_size = self.Subs[i][0]*self.Subs[i][0]*self.Ci*c_0
-
-      # add the rest
-      total_transfer += (ofmap_tile_size + kernel_tile_size)
-
-      return total_transfer
-
-    def systolic_array_utilization(self, xi, area):
-      area_size = area[0] * area[1]
-      A = self.A
-      total_usage = xi * area_size
-      round_up_val = math.ceil(xi/self.A)*self.A \
-          * math.ceil(area[0]*area[1]/self.A)*self.A
-      return xi*area_size/round_up_val
-
-    def compute_bound_cycle(self, i, util_rate, c_0):
-      # total number of ops
-      total_computation = (self.H*self.W*c_0)*\
-          (self.Ci*self.Subs[i][0]*self.Subs[i][0])
-
-      # systolic array calculation capacity
-      comp_cap = (self.A*self.A) * util_rate
-
-      return total_computation / comp_cap
-
-
     def process_parameter(self, x, area):
         area = list(map(lambda i: math.floor(i), area))
         w_0 = min(self.W/math.ceil(self.W/round(area[0])), self.W)
-        h_0 = min(self.H/math.ceil(self.H/round(area[1])), self.H)
+        h_0 =min(self.H/math.ceil(self.H/round(area[1])), self.H)
 
         total_cycle = 0
 
@@ -83,21 +44,47 @@ class DeconvExhaustiveSearcher(LayerBaseMethod):
             c_0 = min(self.Co/math.ceil(self.Co/round(x[i])), self.Co)
 
             # check the result
-            # compute the total number of elements needed to be updated
+            # print(c_0, w_0, h_0, self.Co/c_0, self.W/w_0, self.H/h_0)
+            # compute the total number of elements needed to be updated 
             # if it is row-major.
-            total_transfer = self.data_transfer(i, h_0, w_0, c_0)
+            # (ofmap + ifmap)*total_batch + (ofmap+weights)*Co/c_0
+            total_transfer = (h_0*w_0*c_0+(self.S*h_0+2)*(self.S*w_0+2)*self.Ci) \
+                                *self.Subs[i][0]*self.Subs[i][0]/(h_0*w_0) \
+                                +(h_0*w_0*c_0+self.Subs[i][0]*self.Subs[i][0]*self.Ci*c_0)
 
             # compute the utilization of systolic array
-            util_sys_arr = self.systolic_array_utilization(x[i], area)
+            util_sys_arr = x[i]/(math.ceil(x[i]/self.A)*self.A) \
+                                *area[0]*area[1]/(math.ceil(area[0]*area[1]/self.A)*self.A)
 
-            # compute the cycle for compute-/memory-bound
-            comp_bound_cycle = self.compute_bound_cycle(i, util_sys_arr, c_0)
+            # # compute the utilization of systolic array
+            # util_buf += self.buffer_utilization([c_0, w_0, h_0])/self.buffer_size
+
+            # if util_buf > 1.01:
+            #     return (-1, -1)
+
+            comp_bound_cycle = (self.H*self.W*c_0)*(self.Ci*self.Subs[i][0]*self.Subs[i][0])\
+                                /(self.A*self.A)/util_sys_arr
+
             mem_bound_cycle = total_transfer/self.B
 
-            # pick up the greater value as the actual cycle
             total_cycle += max(comp_bound_cycle, mem_bound_cycle)
 
+            # print comp_bound_cycle, mem_bound_cycle
+
         return (total_cycle, total_transfer)
+
+        # # print(x[0],(math.ceil(x[0]/A)*A), x[1]*x[2], (math.ceil(x[1]*x[2]/A)*A))
+        # ret = {
+        #     "total_transfer": round(total_transfer),
+        #     "total_cycle": round(total_cycle), 
+        #     "systolic_array_utilization": util_sys_arr,
+        #     "buffer_utilization": util_buf,
+        #     "c_0, w_0, h_0": [c_0, w_0, h_0],
+        #     "Tile size" : [self.Co/c_0, self.W/w_0, self.H/h_0],
+        #     "Bound" : bound
+        # }
+        # self.res.append(ret)
+        # return total_cycle
 
     def fill_bufw(self, remain_subkernels):
         x0 = [0]*len(self.data["sub-kernels"])

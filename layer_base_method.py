@@ -27,7 +27,6 @@ def setup_hardware(config):
 
 class LayerBaseMethod(object):
     """docstring for LayerBaseMethod"""
-        
     # info for systolic array
     A = None      # systolic array dimension
 
