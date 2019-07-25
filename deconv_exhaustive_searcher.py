@@ -33,40 +33,32 @@ class DeconvExhaustiveSearcher(LayerBaseMethod):
 
     # (ofmap + ifmap)*total_batch + (ofmap+weights)
     def data_transfer(self, i, h_0, w_0, c_0):
-      # calculate the total batch
-      total_batch = self.Subs[i][0]*self.Subs[i][0]/(h_0*w_0)
+        # calculate the total batch
+        total_batch = self.Subs[i][0]*self.Subs[i][0]/(h_0*w_0)
 
-      # ofmap and ifmap tile size
-      ofmap_tile_size = h_0*w_0*c_0
-      ifmap_tile_size = (self.S*h_0+2)*(self.S*w_0+2)*self.Ci
-      # ofmap + ifmap transfer
-      total_transfer = (ofmap_tile_size + ifmap_tile_size) * total_batch
+        # ofmap and ifmap tile size
+        ofmap_tile_size = h_0*w_0*c_0
+        ifmap_tile_size = (self.S*h_0+2)*(self.S*w_0+2)*self.Ci
+        # ofmap + ifmap transfer
+        total_transfer = (ofmap_tile_size + ifmap_tile_size) * total_batch
 
-      # weight tile size
-      kernel_tile_size = self.Subs[i][0]*self.Subs[i][0]*self.Ci*c_0
+        # weight tile size
+        kernel_tile_size = self.Subs[i][0]*self.Subs[i][0]*self.Ci*c_0
 
-      # add the rest
-      total_transfer += (ofmap_tile_size + kernel_tile_size)
+        # add the rest
+        total_transfer += (ofmap_tile_size + kernel_tile_size)
 
-      return total_transfer
-
-    def systolic_array_utilization(self, xi, area):
-      area_size = area[0] * area[1]
-      A = self.A
-      total_usage = xi * area_size
-      round_up_val = math.ceil(xi/self.A)*self.A \
-          * math.ceil(area[0]*area[1]/self.A)*self.A
-      return xi*area_size/round_up_val
+        return total_transfer
 
     def compute_bound_cycle(self, i, util_rate, c_0):
-      # total number of ops
-      total_computation = (self.H*self.W*c_0)*\
-          (self.Ci*self.Subs[i][0]*self.Subs[i][0])
+        # total number of ops
+        total_computation = (self.H*self.W*c_0)*\
+            (self.Ci*self.Subs[i][0]*self.Subs[i][0])
 
-      # systolic array calculation capacity
-      comp_cap = (self.A*self.A) * util_rate
+        # systolic array calculation capacity
+        comp_cap = (self.A*self.A) * util_rate
 
-      return total_computation / comp_cap
+        return total_computation / comp_cap
 
 
     def process_parameter(self, x, area):
