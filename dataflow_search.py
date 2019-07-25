@@ -154,7 +154,6 @@ if __name__== "__main__":
 
     # import the dnn
     dnn = import_dnn(args.dnnfile, args.ifmap, args.ifmap3d)
-    pprint.pprint(dnn)
     meta_data["dnn"] = dnn
     hw_constraints = hardware_constraints(sa_size=args.sa_size,
              mem_bw=args.memory_bandwidth, buf=args.bufsize, bit_width=args.bit_width)

@@ -123,7 +123,7 @@ def opti_dnn(meta_data, hardware_constraints):
                 # if split the deconv into smaller ones
                 results.append({
                         "data" : data,
-                        "result" :opti_deconv(layer, sys_info)
+                        "result" : opti_deconv(layer, sys_info)
                         })
             else:
                 # scale up the ifmap to the ifmap based on the stride size.

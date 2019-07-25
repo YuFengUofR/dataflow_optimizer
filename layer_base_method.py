@@ -98,9 +98,9 @@ class LayerBaseMethod(object):
 
         return xi*area_size/round_up_val
 
-    def compute_bound_cycle(self, util_rate, c_0):
+    def compute_bound_cycle(self, util_rate):
         # total number of ops
-        total_computation = (self.H*self.W*c_0)*\
+        total_computation = (self.H*self.W*self.Co)*\
             (self.Ci*self.K_h*self.K_w)
 
         # systolic array calculation capacity
@@ -141,7 +141,7 @@ class LayerBaseMethod(object):
         # calculate the amount of cycles of computing all elements.
         if comp_bound:
             bound = "C"
-            total_cycle = self.compute_bound_cycle(util_sys_arr, c_0)
+            total_cycle = self.compute_bound_cycle(util_sys_arr)
         else:
             bound = "M"
             total_cycle = total_transfer/self.B

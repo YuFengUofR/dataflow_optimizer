@@ -31,29 +31,10 @@ class DeconvExhaustiveSearcher(LayerBaseMethod):
 
         return total_buffer
 
-    # (ofmap + ifmap)*total_batch + (ofmap+weights)
-    def data_transfer(self, i, h_0, w_0, c_0):
-        # calculate the total batch
-        total_batch = self.Subs[i][0]*self.Subs[i][0]/(h_0*w_0)
-
-        # ofmap and ifmap tile size
-        ofmap_tile_size = h_0*w_0*c_0
-        ifmap_tile_size = (self.S*h_0+2)*(self.S*w_0+2)*self.Ci
-        # ofmap + ifmap transfer
-        total_transfer = (ofmap_tile_size + ifmap_tile_size) * total_batch
-
-        # weight tile size
-        kernel_tile_size = self.Subs[i][0]*self.Subs[i][0]*self.Ci*c_0
-
-        # add the rest
-        total_transfer += (ofmap_tile_size + kernel_tile_size)
-
-        return total_transfer
-
     def compute_bound_cycle(self, i, util_rate, c_0):
         # total number of ops
         total_computation = (self.H*self.W*c_0)*\
-            (self.Ci*self.Subs[i][0]*self.Subs[i][0])
+            (self.Ci*self.Subs[i][0]*self.Subs[i][1])
 
         # systolic array calculation capacity
         comp_cap = (self.A*self.A) * util_rate
@@ -68,28 +49,38 @@ class DeconvExhaustiveSearcher(LayerBaseMethod):
 
         total_cycle = 0
 
+        # calculate the total data transfer
+        ifmap_tile_size = (self.S*h_0+2)*(self.S*w_0+2)*self.Ci
+
+        # calculate the total batch
+        total_batch = self.H*self.W/(h_0*w_0)
+
+        # ifmap transfer
+        total_transfer = ifmap_tile_size * total_batch
+
         for i in range(len(x)):
             if (round(x[i]) == 0):
                 continue
-            # make the tile size even for every batch
-            c_0 = min(self.Co/math.ceil(self.Co/round(x[i])), self.Co)
 
-            # check the result
-            # compute the total number of elements needed to be updated
-            # if it is row-major.
-            total_transfer = self.data_transfer(i, h_0, w_0, c_0)
+            # compute the total number of elements needed to be updated in row-major.
+            # ofmap and ifmap tile size
+            ofmap_tile_size = h_0*w_0*x[i]
+
+            # weight tile size
+            kernel_tile_size = self.Subs[i][0]*self.Subs[i][0]*self.Ci*x[i]
+            total_transfer += kernel_tile_size + ofmap_tile_size
 
             # compute the utilization of systolic array
             util_sys_arr = self.systolic_array_utilization(x[i], area)
 
             # compute the cycle for compute-/memory-bound
-            comp_bound_cycle = self.compute_bound_cycle(i, util_sys_arr, c_0)
+            comp_bound_cycle = self.compute_bound_cycle(i, util_sys_arr, x[i])
             mem_bound_cycle = total_transfer/self.B
 
             # pick up the greater value as the actual cycle
             total_cycle += max(comp_bound_cycle, mem_bound_cycle)
 
-        return (total_cycle, total_transfer)
+        return (total_cycle, total_transfer, util_sys_arr)
 
     def fill_bufw(self, remain_subkernels):
         x0 = [0]*len(self.data["sub-kernels"])
@@ -103,6 +94,19 @@ class DeconvExhaustiveSearcher(LayerBaseMethod):
                 sum_subs += self.A*sub_size*self.Ci
 
         return x0
+
+    # heuristically decide the area dimenion. [W, H]
+    def area_dimension(self, area):
+        if area >= self.W * self.H:
+          return [self.W, self.H]
+
+        if math.sqrt(area) > self.H:
+          tile_w = math.ceil(self.W/math.sqrt(area))
+          return [self.W/tile_w, self.H]
+
+        tile_w = math.ceil(self.W/math.sqrt(area))
+        tile_h = math.ceil(self.H/math.sqrt(area))
+        return [self.W/tile_w, self.H/tile_h]
 
     # the main optimization routine;
     def opti_buffer(self):
@@ -123,13 +127,15 @@ class DeconvExhaustiveSearcher(LayerBaseMethod):
 
         round_result = []
         result_cache = {}
+
+        # no need to optimize the buffer for ofmap, because it is
+        # bounded ifmap.
+        x1 = self.area_dimension(area)
+
         while not all([sub == 0 for sub in remain_subkernels]):
             # set the initial guess;
             x0 = self.fill_bufw(remain_subkernels)
 
-            # no need to optimize the buffer for ofmap, because it is
-            # bounded ifmap.
-            x1 = [math.sqrt(area), math.sqrt(area)]
 
             util_buf = self.buffer_utilization(x0, x1)/self.buf_size
 
@@ -137,10 +143,10 @@ class DeconvExhaustiveSearcher(LayerBaseMethod):
             if util_buf > 1.01:
                 return
 
-            (cycle, transfer) = self.process_parameter(x0, x1) \
+            (cycle, transfer, util_rate) = self.process_parameter(x0, x1) \
                 if str(x0 + x1) not in result_cache else result_cache[str(x0 + x1)]
 
-            result_cache[str(x0 + x1)] = (cycle, transfer)
+            result_cache[str(x0 + x1)] = (cycle, transfer, util_rate)
 
             if cycle == -1 or transfer == -1:
                 return
@@ -150,7 +156,9 @@ class DeconvExhaustiveSearcher(LayerBaseMethod):
 
             remain_subkernels = np.subtract(remain_subkernels, x0)
 
-            round_result.append(x0)
+            round_result.append({"kernels" :x0,
+                                 "tiles" : x1,
+                                 "systolic array utilization" : util_rate})
 
         ret = {
             "total_transfer": round(total_transfer),
