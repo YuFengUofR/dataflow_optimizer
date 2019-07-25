@@ -16,8 +16,8 @@ class LayerExhaustiveSearcher(LayerBaseMethod):
     res = []
 
     """docstring for LayerExhaustiveSearcher"""
-    def __init__(self, data):
-        super(LayerExhaustiveSearcher, self).__init__(data)
+    def __init__(self, data, sys_info):
+        super(LayerExhaustiveSearcher, self).__init__(data, sys_info)
         self.rets = []
 
     # the main optimization routine;
@@ -50,8 +50,6 @@ class LayerExhaustiveSearcher(LayerBaseMethod):
 
     # optimize one layer
     def optimize(self):
-        global SysArr, Bandwith, BufferSize
-
         self.res = []
         layer_info = self.data
         # set up the new layer information
@@ -63,17 +61,17 @@ class LayerExhaustiveSearcher(LayerBaseMethod):
         # print("##[LAYER]##", self.W, self.H, self.Ci, self.Co, self.K_w, self.K_h)
 
         for i in range(1, 20):
-            self.bufi_size = BufferSize*i/20.0
+            self.bufi_size = self.buf_size*i/20.0
             for j in range(1, 20):
-                self.bufw_size = BufferSize*j/20.0
+                self.bufw_size = self.buf_size*j/20.0
 
                 self.res = []
-                # if sum of bufi and bufw is over the BufferSize
+                # if sum of bufi and bufw is over the self.buf_size
                 # we should skip it.
-                if (self.bufi_size + self.bufw_size) > BufferSize:
+                if (self.bufi_size + self.bufw_size) > self.buf_size:
                     continue
 
-                self.bufo_size = BufferSize - self.bufi_size - self.bufw_size
+                self.bufo_size = self.buf_size - self.bufi_size - self.bufw_size
                 # both cases are possible;
                 self.opti_buffer()
 

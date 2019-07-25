@@ -28,41 +28,30 @@ def setup(meta_data, hardware_constraints):
     if meta_data["schedule"]["static"]:
         raise Exception("The static scheduling is not supported"
             " in constrained optimizer.")
-    else:
-        setup_hardware(hardware_constraints)
 
     enable["combine"] = meta_data["schedule"]["combine"]
     enable["split"] = meta_data["schedule"]["split"]
 
-def setup_hardware(hardware_constraints):
+def single_layer_optimization(data, sys_info):
     global method
     if method == "Constrained":
-        layer_optimizer.setup_hardware(hardware_constraints)
+        return layer_optimizer.LayerOptimizer(data, sys_info).optimize()
     elif method == "Exhaustive":
-        layer_exhaustive_searcher.setup_hardware(hardware_constraints)
+        return layer_exhaustive_searcher.LayerExhaustiveSearcher(data, sys_info).optimize()
     else:
         raise Exception("Unknown search method: {}".format(method))
 
-def single_layer_optimization(data):
+def single_combine_optimization(data, sys_info):
     global method
     if method == "Constrained":
-        return layer_optimizer.LayerOptimizer(data).optimize()
+      return layer_optimizer.LayerOptimizer(data, sys_info).optimize()
     elif method == "Exhaustive":
-        return layer_exhaustive_searcher.LayerExhaustiveSearcher(data).optimize()
-    else:
-        raise Exception("Unknown search method: {}".format(method))
-
-def single_combine_optimization(data):
-    global method
-    if method == "Constrained":
-        return layer_optimizer.LayerOptimizer(data).optimize()
-    elif method == "Exhaustive":
-        return deconv_exhaustive_searcher.DeconvExhaustiveSearcher(data).optimize()
+        return deconv_exhaustive_searcher.DeconvExhaustiveSearcher(data, sys_info).optimize()
     else:
         raise Exception("Unknown search method: {}".format(method))
 
 
-def opti_deconv(layer):
+def opti_deconv(layer, sys_info):
     global method, enable
     # collect individual result from sub_kernels
     subs = []
@@ -81,15 +70,15 @@ def opti_deconv(layer):
         sub4["kernel"] = [sub_one[0], sub_one[1]]
 
         if enable["combine"]:
-            subs.append(single_combine_optimization(layer))
+            subs.append(single_combine_optimization(layer, sys_info))
         else:
-            res1 = single_layer_optimization(sub1)
+            res1 = single_layer_optimization(sub1, sys_info)
             subs.append(res1)
-            res2 = single_layer_optimization(sub2)
+            res2 = single_layer_optimization(sub2, sys_info)
             subs.append(res2)
-            res3 = single_layer_optimization(sub3)
+            res3 = single_layer_optimization(sub3, sys_info)
             subs.append(res3)
-            res4 = single_layer_optimization(sub4)
+            res4 = single_layer_optimization(sub4, sys_info)
             subs.append(res4)
 
     # if the convolution size is even;
@@ -101,10 +90,10 @@ def opti_deconv(layer):
             # this will consider four same-size sub-kernels 
             # as one sub-kernel with more channels
             sub["out_channel"] = sub["out_channel"]*4
-            subs.append(single_layer_optimization(sub4))
+            subs.append(single_layer_optimization(sub4, sys_info))
         else:
             # without combining sub-kernels 
-            res = single_layer_optimization(sub)
+            res = single_layer_optimization(sub, sys_info)
             # times 4 of each individual sub-kernel"s
             # memory traffic and cycles.
             res["total_traffic"] = res["total_traffic"]*4
@@ -118,6 +107,7 @@ def opti_dnn(meta_data, hardware_constraints):
     # set up the configurations;
     setup(meta_data, hardware_constraints)
     dnn = meta_data["dnn"]
+    sys_info = meta_data["system_info"]
 
     results = []
 
@@ -133,7 +123,7 @@ def opti_dnn(meta_data, hardware_constraints):
                 # if split the deconv into smaller ones
                 results.append({
                         "data" : data,
-                        "result" :opti_deconv(layer)
+                        "result" :opti_deconv(layer, sys_info)
                         })
             else:
                 # scale up the ifmap to the ifmap based on the stride size.
@@ -141,7 +131,7 @@ def opti_dnn(meta_data, hardware_constraints):
                 data["ifmap"][1] = layer["ifmap"][1]*2/layer["stride"]
                 results.append({
                         "data" : data,
-                        "result" : single_layer_optimization(data)
+                        "result" : single_layer_optimization(data, sys_info)
                         })
         else:
             data["ofmap"] = [0,0]
@@ -151,7 +141,7 @@ def opti_dnn(meta_data, hardware_constraints):
 
             results.append({
                         "data" : data,
-                        "result" : single_layer_optimization(data)
+                        "result" : single_layer_optimization(data, sys_info)
                         })
 
         # append last result into meta_data

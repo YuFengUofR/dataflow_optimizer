@@ -16,8 +16,8 @@ class DeconvExhaustiveSearcher(LayerBaseMethod):
     rets = []
 
     """docstring for LayerExhaustiveSearcher"""
-    def __init__(self, data):
-        super(DeconvExhaustiveSearcher, self).__init__(data)
+    def __init__(self, data, sys_info):
+        super(DeconvExhaustiveSearcher, self).__init__(data, sys_info)
         self.rets = []
 
 
@@ -131,7 +131,7 @@ class DeconvExhaustiveSearcher(LayerBaseMethod):
             # bounded ifmap.
             x1 = [math.sqrt(area), math.sqrt(area)]
 
-            util_buf = self.buffer_utilization(x0, x1)/self.buffer_size
+            util_buf = self.buffer_utilization(x0, x1)/self.buf_size
 
             # print(util_buf, x1, x0)
             if util_buf > 1.01:
@@ -166,8 +166,6 @@ class DeconvExhaustiveSearcher(LayerBaseMethod):
 
     # optimize one layer
     def optimize(self):
-        global SysArr, Bandwith, BufferSize
-
         self.res = []
         layer_info = self.data
         # set up the new layer information
@@ -185,22 +183,22 @@ class DeconvExhaustiveSearcher(LayerBaseMethod):
             [sub_one[0], sub_one[1]]]
 
         self.Subs = self.data["sub-kernels"]
-        
+
         # print("##[LAYER]##", self.W, self.H, self.Ci, self.Co, self.K_w, self.K_h)
 
         for i in range(1, 20):
-            self.bufi_size = BufferSize*i/20.0
+            self.bufi_size = self.buf_size*i/20.0
             for j in range(1, 20):
-                self.bufw_size = BufferSize*j/20.0
+                self.bufw_size = self.buf_size*j/20.0
 
                 self.res = []
-                # if sum of bufi and bufw is over the BufferSize
+                # if sum of bufi and bufw is over the self.buf_size
                 # we should skip it.
-                if (self.bufi_size + self.bufw_size) > BufferSize:
+                if (self.bufi_size + self.bufw_size) > self.buf_size:
                     continue
 
                 # set ofmap size
-                self.bufo_size = BufferSize - self.bufi_size - self.bufw_size
+                self.bufo_size = self.buf_size - self.bufi_size - self.bufw_size
                 # both cases are possible;
                 self.opti_buffer()
 

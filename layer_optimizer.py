@@ -15,8 +15,8 @@ Threshold = 500.0
 
 class LayerOptimizer(LayerBaseMethod):
     """docstring for LayerOptimizer"""
-    def __init__(self, data):
-        super(LayerOptimizer, self).__init__(data)
+    def __init__(self, data, sys_info):
+        super(LayerOptimizer, self).__init__(data, sys_info)
 
     # variables for optimization
     # this two has been encodes as x[3] = {c_0, h_0, w_0};
@@ -119,7 +119,7 @@ class LayerOptimizer(LayerBaseMethod):
             passed = False
             # print("row-major memory-bound", self.row_major_mem_bound_constraint(solution.x), \
             #      " no longer bounded!")
-        
+
         if passed:
             # print("Row-major memory-bound case PASSED!")
             self.process_parameter(solution.x, True, False)
@@ -276,7 +276,7 @@ class LayerOptimizer(LayerBaseMethod):
     # make sure the buffer utilization is
     # always smaller than buffer size;
     def buffer_constraint2(self, x):
-        return self.buffer_size - (x[0]*x[1]*x[2]+self.Ci*self.K_h*self.K_w*x[0]+\
+        return self.buf_size - (x[0]*x[1]*x[2]+self.Ci*self.K_h*self.K_w*x[0]+\
                 self.Ci*(self.S*x[1]+2)*(self.S*x[2]+2))
 
 
@@ -338,7 +338,7 @@ class LayerOptimizer(LayerBaseMethod):
                 2*(self.S*x[1]+self.S*x[2])*self.Co/(x[1]*x[2])+1/x[0]
 
     # the minimization functions is to moinimize the 
-    #
+    # channel major compute-bound objective
     def channel_major_comp_obj(self, x):
         return self.H*self.W*self.Co/(x[1]*x[2]*x[0])
 

@@ -4,23 +4,6 @@
 import math
 import numpy as np
 
-# info for systolic array
-SysArr = 16.0      # systolic array dimension
-
-# memory bandwith number of bytes can be transferred.
-Bandwith = 16.0/4
-
-# on-chip buffer size
-BufferSize = 1.0*1024.0*1024.0
-
-
-def setup_hardware(config):
-    global SysArr, Bandwith, BufferSize
-    SysArr = config[0]
-    Bandwith = config[1]/(config[3]/8)
-    BufferSize = config[2]
-
-
 ###############################################################
 #                       general process                       #
 ###############################################################
@@ -56,12 +39,12 @@ class LayerBaseMethod(object):
     res = []
 
     """docstring for LayerExhaustiveSearcher"""
-    def __init__(self, data):
-        global SysArr, Bandwith, BufferSize
+    def __init__(self, data, sys_info):
         self.data = data
-        self.A = SysArr
-        self.B = Bandwith
-        self.buffer_size = BufferSize
+        self.sys_info = sys_info
+        self.A = sys_info["sa_size"]
+        self.B = sys_info["memory_bandwidth"]/(sys_info["bit_width"]/8)
+        self.buf_size = sys_info["bufsize"]
         self.res = []
 
 
@@ -151,7 +134,7 @@ class LayerBaseMethod(object):
         util_sys_arr = self.systolic_array_utilization(x[0], x[1:])
 
         # compute the utilization of systolic array
-        util_buf = self.buffer_utilization([c_0, w_0, h_0])/self.buffer_size
+        util_buf = self.buffer_utilization([c_0, w_0, h_0])/self.buf_size
 
         if util_buf > 1.01:
             return
