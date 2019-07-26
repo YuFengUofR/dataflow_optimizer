@@ -131,7 +131,7 @@ class LayerBaseMethod(object):
             total_transfer = self.channel_major_data_transfer(h_0, w_0, c_0)
 
         # compute the utilization of systolic array
-        util_sys_arr = self.systolic_array_utilization(x[0], x[1:])
+        util_sys_arr = self.systolic_array_utilization(c_0, [w_0, h_0])
 
         # compute the utilization of systolic array
         util_buf = self.buffer_utilization([c_0, w_0, h_0])/self.buf_size

@@ -11,29 +11,45 @@ import sys
 # import my own modules
 from dnn_analysis import *
 import layer_optimizer
+import layer_static_method
 import layer_exhaustive_searcher
 import deconv_exhaustive_searcher
 
+
+
 method = None
+buffer_partition = None
 enable = {
+    "static" : False,
     "combine" : False,
     "split" : False,
 }
 
 def setup(meta_data, hardware_constraints):
-    global enable, method
+    global enable, method, buffer_partition
     # define the search method
     method = meta_data["method"]
 
-    if meta_data["schedule"]["static"]:
+    if meta_data["schedule"]["static"] and \
+        "buffer_partition" not in meta_data:
         raise Exception("The static scheduling is not supported"
-            " in constrained optimizer.")
+            " without specifying the buffer partition.")
 
+    if "buffer_partition" in meta_data:
+        buffer_partition = meta_data["buffer_partition"]
+
+    # set the schedule policy
+    enable["static"] = meta_data["schedule"]["static"]
     enable["combine"] = meta_data["schedule"]["combine"]
     enable["split"] = meta_data["schedule"]["split"]
 
 def single_layer_optimization(data, sys_info):
-    global method
+    global method, enable, buffer_partition
+    # if "static" option is enabled, it will be prioritized
+    if enable["static"]:
+      return layer_static_method.LayerStaticMethod(data, sys_info, buffer_partition).optimize()
+
+    # check the potential method we use here.
     if method == "Constrained":
         return layer_optimizer.LayerOptimizer(data, sys_info).optimize()
     elif method == "Exhaustive":
@@ -49,7 +65,6 @@ def single_combine_optimization(data, sys_info):
         return deconv_exhaustive_searcher.DeconvExhaustiveSearcher(data, sys_info).optimize()
     else:
         raise Exception("Unknown search method: {}".format(method))
-
 
 def opti_deconv(layer, sys_info):
     global method, enable
@@ -87,12 +102,12 @@ def opti_deconv(layer, sys_info):
         sub["kernel"][0] = sub["kernel"][0]/2
         sub["kernel"][1] = sub["kernel"][1]/2
         if enable_combine:
-            # this will consider four same-size sub-kernels 
+            # this will consider four same-size sub-kernels
             # as one sub-kernel with more channels
             sub["out_channel"] = sub["out_channel"]*4
             subs.append(single_layer_optimization(sub4, sys_info))
         else:
-            # without combining sub-kernels 
+            # without combining sub-kernels
             res = single_layer_optimization(sub, sys_info)
             # times 4 of each individual sub-kernel"s
             # memory traffic and cycles.

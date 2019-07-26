@@ -28,6 +28,8 @@ argparser.add_argument("--ifmap", nargs="+", type=int, required=True,
                         help="the ifmap dimemsion, order: [W H C]")
 argparser.add_argument("--ifmap3d", nargs="+", type=int, required=False,
                         help="the ifmap dimemsion, order: [W H D C]")
+argparser.add_argument("--buffer_partition", nargs="+", type=float,
+                        help="the ifmap dimemsion, order: [I O W]")
 argparser.add_argument("--search_method", default="Constrained",
                         choices=["Constrained", "Exhaustive"],
                         help="Dataflow search methods: constraint optoimization"
@@ -135,6 +137,8 @@ def system_config(args, meta_data):
     meta_data["schedule"]["static"] = args.static
     meta_data["schedule"]["split"] = args.split
     meta_data["schedule"]["combine"] = args.combine
+    if args.buffer_partition:
+        meta_data["buffer_partition"] = args.buffer_partition
 
     # setup the system;
     meta_data["system_info"] = {}
