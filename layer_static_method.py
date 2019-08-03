@@ -48,7 +48,7 @@ class LayerStaticMethod(LayerBaseMethod):
 
         # no need to optimize the buffer for ofmap, because it is
         # bounded ifmap.
-        x = [x0[0], math.sqrt(x0[1]), math.sqrt(x0[1])]
+        x = [x0[0], self.H*self.S, math.floor(x0[1]/(self.H*self.S*self.S))]
         self.process_parameter(x, False, False)
         self.process_parameter(x, False, True)
         self.process_parameter(x, True, False)

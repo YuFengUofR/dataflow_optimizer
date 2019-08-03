@@ -31,9 +31,9 @@ argparser.add_argument("--ifmap3d", nargs="+", type=int, required=False,
 argparser.add_argument("--buffer_partition", nargs="+", type=float,
                         help="the ifmap dimemsion, order: [I O W]")
 argparser.add_argument("--search_method", default="Constrained",
-                        choices=["Constrained", "Exhaustive"],
+                        choices=["Constrained", "Exhaustive", "Combined"],
                         help="Dataflow search methods: constraint optoimization"
-                        " or exhaustive search.")
+                        ", exhaustive search or combining both.")
 
 # other hardware configurations
 argparser.add_argument("--bufsize", type=float, default=1048576.0*1.5,

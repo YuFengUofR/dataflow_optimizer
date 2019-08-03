@@ -47,3 +47,31 @@ class LayerExhaustiveSearcher(LayerStaticMethod):
                 ret = dict(item)
 
         return ret
+
+    # the main optimization routine;
+    def opti_buffer(self):
+        # set the initial guess;
+        x0 = [self.A, self.A]
+
+        # check if the initial configuration can hold the minimum requirements
+        if ((x0[0]*self.K_h*self.K_w*self.Ci > self.bufw_size) or
+            (self.S*self.S*x0[1]*self.Ci > self.bufi_size)):
+            return
+
+        # first, let's find the number of kernel we can put into buffer.
+        while (x0[0]+self.A)*self.K_h*self.K_w*self.Ci < self.bufw_size:
+            x0[0] = x0[0]+self.A
+
+        # next let's see how much ifmap can we fit into the buffer.
+        while self.S*self.S*(x0[1]+self.A)*self.Ci < self.bufi_size:
+            x0[1] = x0[1]+self.A
+
+
+        # no need to optimize the buffer for ofmap, because it is
+        # bounded ifmap.
+        x = [x0[0], math.sqrt(x0[1]), math.sqrt(x0[1])]
+        self.process_parameter(x, False, False)
+        self.process_parameter(x, False, True)
+        self.process_parameter(x, True, False)
+        self.process_parameter(x, True, True)
+

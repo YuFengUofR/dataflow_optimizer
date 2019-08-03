@@ -15,8 +15,6 @@ import layer_static_method
 import layer_exhaustive_searcher
 import deconv_exhaustive_searcher
 
-
-
 method = None
 buffer_partition = None
 enable = {
@@ -54,6 +52,8 @@ def single_layer_optimization(data, sys_info):
         return layer_optimizer.LayerOptimizer(data, sys_info).optimize()
     elif method == "Exhaustive":
         return layer_exhaustive_searcher.LayerExhaustiveSearcher(data, sys_info).optimize()
+    elif method == "Combined":
+        return layer_optimizer.LayerOptimizer(data, sys_info, True).optimize()
     else:
         raise Exception("Unknown search method: {}".format(method))
 
@@ -63,6 +63,8 @@ def single_combine_optimization(data, sys_info):
       return layer_optimizer.LayerOptimizer(data, sys_info).optimize()
     elif method == "Exhaustive":
         return deconv_exhaustive_searcher.DeconvExhaustiveSearcher(data, sys_info).optimize()
+    elif method == "Combined":
+        return layer_optimizer.LayerOptimizer(data, sys_info, True).optimize()
     else:
         raise Exception("Unknown search method: {}".format(method))
 

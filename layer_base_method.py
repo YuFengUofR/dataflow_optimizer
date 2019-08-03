@@ -47,7 +47,6 @@ class LayerBaseMethod(object):
         self.buf_size = sys_info["bufsize"]
         self.res = []
 
-
     # compute buffer utilization
     def buffer_utilization(self, x):
         # buffer = ofmap + weights + ifmap
@@ -93,8 +92,9 @@ class LayerBaseMethod(object):
         area_size = area[0] * area[1]
         A = self.A
         total_usage = xi * area_size
-        round_up_val = math.ceil(xi/A)*A \
-            * math.ceil(area[0]*area[1]/A)*A
+        round_up_val = math.ceil(float(xi/A))*A \
+            * math.ceil(float(area[0])/A)*A \
+            * math.ceil(float(area[1])/A)*A
 
         return xi*area_size/round_up_val
 
