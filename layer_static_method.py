@@ -41,14 +41,21 @@ class LayerStaticMethod(LayerBaseMethod):
         while (x0[0]+self.A)*self.K_h*self.K_w*self.Ci < self.bufw_size:
             x0[0] = x0[0]+self.A
 
-        # next let's see how much ifmap can we fit into the buffer.
-        while self.S*self.S*(x0[1]+self.A)*self.Ci < self.bufi_size:
-            x0[1] = x0[1]+self.A
+        # next let's see what percentage of ifmap can we fit into the buffer.
+        if self.K_h*(2*self.S+self.W) >= self.bufi_size:
+            while self.K_h*(self.S+x0[1]+self.A)*self.Ci < self.bufi_size:
+                x0[1] = x0[1]+self.A
+            # no need to optimize the buffer for ofmap, because it is
+            # bounded ifmap.
+            x = [x0[0], x0[1], 1]
+        else:
+            h_0 = 1
+            while self.K_h*(self.S+self.W)*(self.S+h_0+1)*self.Ci < self.bufi_size:
+                h_0 += 1
+            # no need to optimize the buffer for ofmap, because it is
+            # bounded ifmap.
+            x = [x0[0], self.W, h_0]
 
-
-        # no need to optimize the buffer for ofmap, because it is
-        # bounded ifmap.
-        x = [x0[0], self.H*self.S, math.floor(x0[1]/(self.H*self.S*self.S))]
         self.process_parameter(x, False, False)
         self.process_parameter(x, False, True)
         self.process_parameter(x, True, False)

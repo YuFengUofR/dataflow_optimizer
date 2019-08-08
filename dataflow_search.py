@@ -86,7 +86,7 @@ def import_dnn(filename, ifmap_dim, ifmap3d_dim):
                 ifmap_dim = [ifmap_dim[0]*2/prev_layer["stride"], \
                             ifmap_dim[1]*2/prev_layer["stride"], \
                             prev_layer["out_channel"]]
-            else: 
+            else:
                 # if it is Conv, scale down the ifmap dimemsion by stride;
                 ifmap_dim = [ifmap_dim[0]/prev_layer["stride"], \
                             ifmap_dim[1]/prev_layer["stride"], \

@@ -37,8 +37,7 @@ class LayerBaseMethod(object):
 
     # array to store the result from the four different results
     res = []
-
-    """docstring for LayerExhaustiveSearcher"""
+    """docstring for LayerBaseMethod"""
     def __init__(self, data, sys_info):
         self.data = data
         self.sys_info = sys_info
