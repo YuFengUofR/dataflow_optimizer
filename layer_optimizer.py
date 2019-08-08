@@ -96,9 +96,8 @@ class LayerOptimizer(LayerBaseMethod):
         con4 = {'type': 'ineq', 'fun': self.buffer_constraint2}
 
         # summery all the bounds and constraints
-        bnds = ((min(self.A, self.Co),self.Co), (min(math.floor(math.sqrt(self.A)), self.H), self.H), \
-                (min(math.floor(math.sqrt(self.A)), self.W), self.W))
-        cons= ([con1, con2, con3, con4])
+        bnds = self.variable_boundary()
+        cons = ([con1, con2, con3, con4])
 
         # call the external solver to solve the solution
         solution = minimize(self.row_major_mem_obj, x0, method='SLSQP',\
@@ -140,9 +139,8 @@ class LayerOptimizer(LayerBaseMethod):
         con4 = {'type': 'ineq', 'fun': self.buffer_constraint2}
 
         # summery all the bounds and constraints
-        bnds = ((min(self.A, self.Co), self.Co), (min(math.floor(math.sqrt(self.A)), self.H), self.H), \
-                (min(math.floor(math.sqrt(self.A)), self.W), self.W))
-        cons= ([con1, con2, con3, con4])
+        bnds = self.variable_boundary()
+        cons = ([con1, con2, con3, con4])
 
         # call the external solver to solve the solution
         solution = minimize(self.row_major_comp_obj, x0, method='SLSQP',\
@@ -185,9 +183,8 @@ class LayerOptimizer(LayerBaseMethod):
         con4 = {'type': 'ineq', 'fun': self.buffer_constraint2}
 
         # summery all the bounds and constraints
-        bnds = ((min(self.A, self.Co), self.Co), (min(math.floor(math.sqrt(self.A)), self.H),self.H), \
-                (min(math.floor(math.sqrt(self.A)), self.W), self.W))
-        cons= ([con1, con2, con3, con4])
+        bnds = self.variable_boundary()
+        cons = ([con1, con2, con3, con4])
 
         # call the external solver to solve the solution
         solution = minimize(self.channel_major_mem_obj, x0, method='SLSQP',\
@@ -229,9 +226,8 @@ class LayerOptimizer(LayerBaseMethod):
         con4 = {'type': 'ineq', 'fun': self.buffer_constraint2}
 
         # summery all the bounds and constraints
-        bnds = ((min(self.A, self.Co), self.Co), (min(math.floor(math.sqrt(self.A)), self.H), self.H), \
-                (min(math.floor(math.sqrt(self.A)), self.W), self.W))
-        cons= ([con1, con2, con3, con4])
+        bnds = self.variable_boundary()
+        cons = ([con1, con2, con3, con4])
 
         # call the external solver to solve the solution
         solution = minimize(self.channel_major_comp_obj, x0, method='SLSQP',\
@@ -277,6 +273,7 @@ class LayerOptimizer(LayerBaseMethod):
         return self.buf_size - (x[0]*x[1]*x[2]+self.Ci*self.K_h*self.K_w*x[0]+\
                 self.Ci*(self.S*x[1]+2)*(self.S*x[2]+2))
 
+    # set initial guess for constrained optimization
     def init_guess(self):
         # set the initial guess;
         x0 = [min(self.A, self.Co), min(math.floor(math.sqrt(self.A)), self.H), \
@@ -286,6 +283,13 @@ class LayerOptimizer(LayerBaseMethod):
           x0 = result["c_0, w_0, h_0"]
 
         return x0
+
+    # set constraints for the variables in the optimization
+    def variable_boundary(self):
+      return ((min(self.A, self.Co), self.Co),
+              (min(math.floor(math.sqrt(self.A)), self.H), self.H),
+              (min(math.floor(math.sqrt(self.A)), self.W), self.W))
+
 
     ###############################################################
     #       row-major constraint solving obj and constraints      #
