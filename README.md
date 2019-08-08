@@ -12,7 +12,7 @@ The goal of this optimizer are followings:
 * Second, this optimizer explores different searching or optimization schemes,
   so that, we can show the trade-off between different optimization schemes.
 * Third, this optimizer can automatically decompose deconvolutions in the
-  DNN pipeline and apply different level optimization to deconvolutions
+  DNN pipeline and apply different level optimizations to deconvolutions.
 
 ## What's inside
 

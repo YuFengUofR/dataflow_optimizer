@@ -7,6 +7,7 @@ from scipy.optimize import minimize
 
 # my own module
 from layer_base_method import *
+import layer_exhaustive_searcher
 
 # threshold for bounds
 # if the constraint result is negative but within this threshold,
@@ -15,8 +16,9 @@ Threshold = 500.0
 
 class LayerOptimizer(LayerBaseMethod):
     """docstring for LayerOptimizer"""
-    def __init__(self, data, sys_info):
+    def __init__(self, data, sys_info, combined=False):
         super(LayerOptimizer, self).__init__(data, sys_info)
+        self.combined = combined
 
     # variables for optimization
     # this two has been encodes as x[3] = {c_0, h_0, w_0};
@@ -84,8 +86,7 @@ class LayerOptimizer(LayerBaseMethod):
     # the main optimization of memory-bound and row-major case;
     def opti_mem_row_major(self):
         # set the initial guess;
-        x0 = [min(self.A, self.Co), min(math.floor(math.sqrt(self.A)), self.H), \
-                min(math.floor(math.sqrt(self.A)), self.W)]
+        x0 = self.init_guess()
         # for row_major_constraint1
         con1 = {'type': 'ineq', 'fun': self.row_major_constraint}
         # for mem_bound_constraint
@@ -129,8 +130,7 @@ class LayerOptimizer(LayerBaseMethod):
     # the main optimization of compute-bound and row-major case;
     def opti_comp_row_major(self):
         # set the initial guess;
-        x0 = [min(self.A, self.Co), min(math.floor(math.sqrt(self.A)),self.H), \
-                min(math.floor(math.sqrt(self.A)), self.W)]
+        x0 = self.init_guess()
         # for row_major_constraint1
         con1 = {'type': 'ineq', 'fun': self.row_major_constraint}
         # for mem_bound_constraint
@@ -175,8 +175,7 @@ class LayerOptimizer(LayerBaseMethod):
     # the main optimization of memory-bound and channel-major case;
     def opti_mem_channel_major(self):
         # set the initial guess;
-        x0 = [min(self.A, self.Co), min(math.floor(math.sqrt(self.A)), self.H), \
-                min(math.floor(math.sqrt(self.A)), self.W)]
+        x0 = self.init_guess()
         # for row_major_constraint1
         con1 = {'type': 'ineq', 'fun': self.channel_major_constraint}
         # for mem_bound_constraint
@@ -220,8 +219,7 @@ class LayerOptimizer(LayerBaseMethod):
     # the main optimization of compute-bound and channel-major case;
     def opti_comp_channel_major(self):
         # set the initial guess;
-        x0 = [min(self.A, self.Co), min(math.floor(math.sqrt(self.A)), self.H), \
-                min(math.floor(math.sqrt(self.A)), self.W)]
+        x0 = self.init_guess()
         # for row_major_constraint1
         con1 = {'type': 'ineq', 'fun': self.channel_major_constraint}
         # for mem_bound_constraint
@@ -279,6 +277,15 @@ class LayerOptimizer(LayerBaseMethod):
         return self.buf_size - (x[0]*x[1]*x[2]+self.Ci*self.K_h*self.K_w*x[0]+\
                 self.Ci*(self.S*x[1]+2)*(self.S*x[2]+2))
 
+    def init_guess(self):
+        # set the initial guess;
+        x0 = [min(self.A, self.Co), min(math.floor(math.sqrt(self.A)), self.H), \
+                min(math.floor(math.sqrt(self.A)), self.W)]
+        if self.combined:
+          result = layer_exhaustive_searcher.LayerExhaustiveSearcher(self.data, self.sys_info).optimize()
+          x0 = result["c_0, w_0, h_0"]
+
+        return x0
 
     ###############################################################
     #       row-major constraint solving obj and constraints      #
