@@ -45,15 +45,18 @@ def single_layer_optimization(data, sys_info):
     global method, enable, buffer_partition
     # if "static" option is enabled, it will be prioritized
     if enable["static"]:
-      return layer_static_method.LayerStaticMethod(data, sys_info, buffer_partition).optimize()
+      return layer_static_method.\
+          LayerStaticMethod(data,sys_info, buffer_partition).optimize()
 
     # check the potential method we use here.
     if method == "Constrained":
         return layer_optimizer.LayerOptimizer(data, sys_info).optimize()
     elif method == "Exhaustive":
-        return layer_exhaustive_searcher.LayerExhaustiveSearcher(data, sys_info).optimize()
+        return layer_exhaustive_searcher.\
+            LayerExhaustiveSearcher(data, sys_info).optimize()
     elif method == "Combined":
-        return layer_optimizer.LayerOptimizer(data, sys_info, True).optimize()
+        return layer_optimizer.\
+            LayerOptimizer(data, sys_info, True).optimize()
     else:
         raise Exception("Unknown search method: {}".format(method))
 
@@ -62,9 +65,11 @@ def single_combine_optimization(data, sys_info):
     if method == "Constrained":
       return layer_optimizer.LayerOptimizer(data, sys_info).optimize()
     elif method == "Exhaustive":
-        return deconv_exhaustive_searcher.DeconvExhaustiveSearcher(data, sys_info).optimize()
+        return deconv_exhaustive_searcher.\
+            DeconvExhaustiveSearcher(data, sys_info).optimize()
     elif method == "Combined":
-        return layer_optimizer.LayerOptimizer(data, sys_info, True).optimize()
+        return layer_optimizer.\
+            LayerOptimizer(data, sys_info, True).optimize()
     else:
         raise Exception("Unknown search method: {}".format(method))
 

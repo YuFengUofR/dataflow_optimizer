@@ -93,8 +93,7 @@ class LayerBaseMethod(object):
         A = self.A
         total_usage = xi * area_size
         round_up_val = math.ceil(float(xi/A))*A \
-            * math.ceil(float(area[0])/A)*A \
-            * math.ceil(float(area[1])/A)*A
+            * math.ceil(float(area[0] * area[1])/A)*A
 
         return xi*area_size/round_up_val
 
