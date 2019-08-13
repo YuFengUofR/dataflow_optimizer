@@ -100,12 +100,7 @@ class LayerStaticMethod(LayerBaseMethod):
 
     # optimize one layer
     def optimize(self):
-        layer_info = self.data
-        # set up the new layer information
-        [self.W, self.H, self.Ci] = layer_info["ifmap"]
-        self.Co = layer_info["out_channel"]
-        [self.K_w, self.K_h] = layer_info["kernel"]
-        self.S = layer_info["stride"]
+        self.init_setup()
 
         # start the optimization
         self.res = []

@@ -174,14 +174,9 @@ class DeconvExhaustiveSearcher(LayerBaseMethod):
 
     # optimize one layer
     def optimize(self):
-        self.res = []
+        self.init_setup()
+  
         layer_info = self.data
-        # set up the new layer information
-        [self.W, self.H, self.Ci] = layer_info["ifmap"]
-        self.Co = layer_info["out_channel"]
-        [self.K_w, self.K_h] = layer_info["kernel"]
-        self.S = layer_info["stride"]
-
         add_one = [(i+1)/2 for i in layer_info["kernel"]]
         sub_one = [i/2 for i in layer_info["kernel"]]
         self.data["sub-kernels"] = [

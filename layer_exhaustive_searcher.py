@@ -22,12 +22,7 @@ class LayerExhaustiveSearcher(LayerStaticMethod):
 
     # optimize one layer
     def optimize(self):
-        layer_info = self.data
-        # set up the new layer information
-        [self.W, self.H, self.Ci] = layer_info["ifmap"]
-        self.Co = layer_info["out_channel"]
-        [self.K_w, self.K_h] = layer_info["kernel"]
-        self.S = layer_info["stride"]
+        self.init_setup()
 
         for i in range(1, 20):
             self.bufi_size = self.buf_size*i/20.0

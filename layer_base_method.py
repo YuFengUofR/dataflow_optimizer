@@ -34,9 +34,9 @@ class LayerBaseMethod(object):
     bufo_size = None
     bufw_size = None
 
-
     # array to store the result from the four different results
     res = []
+
     """docstring for LayerBaseMethod"""
     def __init__(self, data, sys_info):
         self.data = data
@@ -45,6 +45,15 @@ class LayerBaseMethod(object):
         self.B = sys_info["memory_bandwidth"]/(sys_info["bit_width"]/8)
         self.buf_size = sys_info["bufsize"]
         self.res = []
+
+    def init_setup(self):
+        self.res = []
+        layer_info = self.data
+        # set up the new layer information
+        [self.W, self.H, self.Ci] = layer_info["ifmap"]
+        self.Co = layer_info["out_channel"]
+        [self.K_w, self.K_h] = layer_info["kernel"]
+        self.S = layer_info["stride"]
 
     # compute buffer utilization
     def buffer_utilization(self, x):
