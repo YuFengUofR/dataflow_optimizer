@@ -249,7 +249,24 @@ class LayerOptimizer(LayerBaseMethod):
         else:
             return None
 
+    ###############################################################
+    #                     general computations                    #
+    ###############################################################
 
+    def ofmap_tile(self, x):
+        return x[0]*x[1]*x[2]
+
+    def weight_tile(self, num):
+        return self.Ci*self.K_h*self.K_w*num
+
+    def ifmap_tile(self, x):
+        return self.Ci*(self.S*x[1]+2)*(self.S*x[2]+2)
+
+    def total_ofmap_size(self):
+        return self.H*self.W*self.Co
+
+    def total_weight_size(self):
+        return self.weight_tile(self.Co)
 
     ###############################################################
     #                     general constraints                     #
@@ -258,16 +275,15 @@ class LayerOptimizer(LayerBaseMethod):
     # make sure the buffer utilization is always larger than 0
     def buffer_constraint1(self, x):
         # buffer = ofmap + weights + ifmap
-        return (x[0]*x[1]*x[2]+self.Ci*self.K_h*self.K_w*x[0]
-                +self.Ci*(self.S*x[1]+2)*(self.S*x[2]+2))
+        return (self.ofmap_tile(x) +
+                self.weight_tile(x[0]) +
+                self.ifmap_tile(x))
 
     # the upper bound of the buffer size;
     # make sure the buffer utilization is
     # always smaller than buffer size;
     def buffer_constraint2(self, x):
-        return (self.buf_size -
-                (x[0]*x[1]*x[2] + self.Ci*self.K_h*self.K_w*x[0] +
-                 self.Ci*(self.S*x[1]+2)*(self.S*x[2]+2)))
+        return (self.buf_size - self.buffer_constraint1(x))
 
     # set initial guess for constrained optimization
     def init_guess(self):
@@ -300,13 +316,12 @@ class LayerOptimizer(LayerBaseMethod):
     # this expression can be finally reduce to:
     #   (H*W*Co/c_0 + 2(h_0+w_0)Ci*H*W*Co/(h_0*w_0*c_0)+h_0*w_0*Co/c_0
     def row_major_mem_obj(self, x):
-        return (x[0]*x[1]*x[2] + (self.S*x[1]+2)*(self.S*x[2]+2)*self.Ci)*\
-                (self.H*self.W*self.Co/(x[0]*x[1]*x[2])-self.Co/x[0]) \
-                + (self.K_h*self.K_w*self.Ci)*self.Co/x[0] + x[1]*x[2]*self.Co
-        # return H*W*Co/x[0]*(1+2*S*(x[1]+x[2])*Ci/(x[1]*x[2])) + x[1]*x[2]/x[0]
+      return (self.ofmap_tile(x) + self.ifmap_tile(x)) \
+          * (self.total_ofmap_size()/self.ofmap_tile(x) - self.Co/x[0]) \
+          + self.total_weight_size()/x[0] + x[1]*x[2]*self.Co
 
     def row_major_comp_obj(self, x):
-        return self.H*self.W*self.Co/(x[1]*x[2]*x[0])
+      return self.total_ofmap_size() / self.ofmap_tile(x)
 
     # make sure the load for row-major is always less than
     # load for channel-major, range : [0, +inf]
@@ -320,9 +335,8 @@ class LayerOptimizer(LayerBaseMethod):
     # (c_0*(h_0*w_0)+C*((S*h_0+2)*(S*w_0+2))/B >= (K^2*C/A^2)*c_0*w_0*h_0
     # range : [0, +inf]
     def row_major_mem_bound_constraint(self, x):
-        return (x[0]*x[1]*x[2] + self.Ci*(self.S*x[1]+2)*(self.S*x[2]+2))/self.B \
-            - self.K_h*self.K_w*self.Ci/(self.A*self.A)*x[0]*x[1]*x[2]
-
+      return (self.ofmap_tile(x) + self.ifmap_tile(x)) / self.B \
+          - self.weight_tile(1)/(self.A*self.A)*self.ofmap_tile(x)
 
     # make sure the process is always compute-bound;
     # which is the latency for compute is always
@@ -330,9 +344,8 @@ class LayerOptimizer(LayerBaseMethod):
     # (c_0*(h_0*w_0)+C*((S*h_0+2)*(S*w_0+2))/B <= (K^2*C/A^2)*c_0*w_0*h_0
     # range : [0, +inf]
     def row_major_comp_bound_constraint(self, x):
-        return self.K_h*self.K_w*self.Ci/(self.A*self.A)*x[0]*x[1]*x[2] \
-            - (x[0]*x[1]*x[2] + self.Ci*(self.S*x[1]+2)*(self.S*x[2]+2))/self.B
-
+        return self.weight_tile(1)/(self.A*self.A)*self.ofmap_tile(x) \
+            - (self.ofmap_tile(x) + self.ifmap_tile(x)) / self.B
 
     ###############################################################
     #     channel-major constraint solving obj and constraints    #
@@ -343,13 +356,13 @@ class LayerOptimizer(LayerBaseMethod):
     # (K^2*Ci*c_0+h_0*w_0*c_0)*(H*W*Co)/(h_0*w_0*c_0)
     # + [(h_0+2)(w_0+2)*Ci + h_0*w_0*c_0]*(H*W)/(h_0*w_0)
     def channel_major_mem_obj(self, x):
-        return (self.K_h*self.K_w*self.Ci*self.Co)/(x[1]*x[2]) + \
+        return (self.total_weight_size)/(x[1]*x[2]) + \
             2*(self.S*x[1]+self.S*x[2])*self.Co/(x[1]*x[2])+1/x[0]
 
     # the minimization functions is to moinimize the
     # channel major compute-bound objective
     def channel_major_comp_obj(self, x):
-        return self.H*self.W*self.Co/(x[1]*x[2]*x[0])
+        return self.total_ofmap_size()/(x[1]*x[2]*x[0])
 
     # make sure the load for channel-major is always less than
     # load for row-major, range : [0, +inf]
@@ -363,8 +376,8 @@ class LayerOptimizer(LayerBaseMethod):
     # c_0*(h_0*w_0+K^2*C)/B >= (K^2*C/A^2)*c_0*(h_0*w_0)
     # range : [0, +inf]
     def channel_major_mem_bound_constraint(self, x):
-        return (x[1]*x[2]+self.K_h*self.K_w*self.Ci)/self.B \
-            - self.K_h*self.K_w*self.Ci/(self.A*self.A)*x[1]*x[2]
+        return (x[1]*x[2] + self.weight_tile(1)) / self.B \
+            - self.weight_tile(1)/(self.A*self.A)*x[1]*x[2]
 
     # make sure the process is always memory-bound;
     # which is the latency for memory access is always
@@ -374,7 +387,5 @@ class LayerOptimizer(LayerBaseMethod):
     def channel_major_comp_bound_constraint(self, x):
         return self.K_h*self.K_w*self.Co/(self.A*self.A)*x[1]*x[2] \
             - (x[1]*x[2]+self.K_h*self.K_w*self.Co)/self.B
-
-
 
 
