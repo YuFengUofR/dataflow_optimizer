@@ -84,8 +84,8 @@ def import_dnn(filename, ifmap_dim, ifmap3d_dim):
                 # increase the deconv ofmap by two, as default,
                 # we only consider stride of 1
                 ifmap_dim = [ifmap_dim[0]*2/prev_layer["stride"], \
-                            ifmap_dim[1]*2/prev_layer["stride"], \
-                            prev_layer["out_channel"]]
+                             ifmap_dim[1]*2/prev_layer["stride"], \
+                             prev_layer["out_channel"]]
             else:
                 # if it is Conv, scale down the ifmap dimemsion by stride;
                 ifmap_dim = [ifmap_dim[0]/prev_layer["stride"], \
@@ -106,22 +106,21 @@ def import_dnn(filename, ifmap_dim, ifmap3d_dim):
                 # increase the deconv ofmap by two, as default,
                 # we only consider stride of 1
                 ifmap3d_dim = [ifmap3d_dim[0]*2/prev_layer["stride"], \
-                            ifmap_dim[1]*2/prev_layer["stride"], \
-                            ifmap_dim[2]*2/prev_layer["stride"], \
-                            prev_layer["out_channel"]]
-            else: 
+                               ifmap_dim[1]*2/prev_layer["stride"], \
+                               ifmap_dim[2]*2/prev_layer["stride"], \
+                               prev_layer["out_channel"]]
+            else:
                 # if it is Conv, scale down the ifmap dimemsion by stride;
                 ifmap3d_dim = [ifmap3d_dim[0]/prev_layer["stride"], \
-                            ifmap3d_dim[1]/prev_layer["stride"], \
-                            ifmap3d_dim[2]/prev_layer["stride"],  \
-                            prev_layer["out_channel"]]  
-
+                               ifmap3d_dim[1]/prev_layer["stride"], \
+                               ifmap3d_dim[2]/prev_layer["stride"],  \
+                               prev_layer["out_channel"]]
 
     return dnn
 
 # The hardware constraints are:
-#   1. the on-chip buffer size; 
-#   2. the memory bandwidth; (Unit in bytes/cycle) 
+#   1. the on-chip buffer size;
+#   2. the memory bandwidth; (Unit in bytes/cycle)
 #   3. the systolic array size;
 def hardware_constraints(sa_size=16.0, mem_bw=6.4*4, buf=1048576.0*1.5, bit_width=16.0):
     systolic_arr_size = sa_size;
@@ -160,7 +159,9 @@ if __name__== "__main__":
     dnn = import_dnn(args.dnnfile, args.ifmap, args.ifmap3d)
     meta_data["dnn"] = dnn
     hw_constraints = hardware_constraints(sa_size=args.sa_size,
-             mem_bw=args.memory_bandwidth, buf=args.bufsize, bit_width=args.bit_width)
+                                          mem_bw=args.memory_bandwidth,
+                                          buf=args.bufsize,
+                                          bit_width=args.bit_width)
 
     # start the optimization main routine
     res = dnn_optimizer.opti_dnn(meta_data, hw_constraints)

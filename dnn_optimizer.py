@@ -63,7 +63,8 @@ def single_layer_optimization(data, sys_info):
 def single_combine_optimization(data, sys_info):
     global method
     if method == "Constrained":
-      return layer_optimizer.LayerOptimizer(data, sys_info).optimize()
+      return layer_optimizer.\
+            LayerOptimizer(data, sys_info).optimize()
     elif method == "Exhaustive":
         return deconv_exhaustive_searcher.\
             DeconvExhaustiveSearcher(data, sys_info).optimize()
@@ -73,6 +74,33 @@ def single_combine_optimization(data, sys_info):
     else:
         raise Exception("Unknown search method: {}".format(method))
 
+def sub_kernel_sizes(layer):
+    add_one = [(i+1)/2 for i in layer["kernel"]]
+    sub_one = [i/2 for i in layer["kernel"]]
+
+    sizes = [[]]
+    for i in range(len(layer["kernel"])):
+      tmp = []
+      for j in sizes:
+        e1 = list(j) + [add_one[i]]
+        e2 = list(j) + [sub_one[i]]
+        tmp += [e1, e2]
+
+      sizes = tmp
+
+    return sizes
+
+def single_split_optimization(layer, sys_info):
+    subs = []
+
+    # iterate all possible sub_kernels
+    for sub_size in sub_kernel_sizes(layer):
+        sub = dict(layer)
+        sub["kernel"] = sub_size
+        subs.append(single_layer_optimization(sub, sys_info))
+
+    return subs
+
 def opti_deconv(layer, sys_info):
     global method, enable
     # collect individual result from sub_kernels
@@ -80,29 +108,10 @@ def opti_deconv(layer, sys_info):
 
     # if the convolution size is odd;
     if layer["kernel"][0]%2 == 1:
-        add_one = [(i+1)/2 for i in layer["kernel"]]
-        sub_one = [i/2 for i in layer["kernel"]]
-        sub1 = dict(layer)
-        sub1["kernel"] = [add_one[0], add_one[1]]
-        sub2 = dict(layer)
-        sub2["kernel"] = [add_one[0], sub_one[1]]
-        sub3 = dict(layer)
-        sub3["kernel"] = [sub_one[0], add_one[1]]
-        sub4 = dict(layer)
-        sub4["kernel"] = [sub_one[0], sub_one[1]]
-
         if enable["combine"]:
             subs.append(single_combine_optimization(layer, sys_info))
         else:
-            res1 = single_layer_optimization(sub1, sys_info)
-            subs.append(res1)
-            res2 = single_layer_optimization(sub2, sys_info)
-            subs.append(res2)
-            res3 = single_layer_optimization(sub3, sys_info)
-            subs.append(res3)
-            res4 = single_layer_optimization(sub4, sys_info)
-            subs.append(res4)
-
+            subs = single_split_optimization(layer, sys_info)
     # if the convolution size is even;
     else:
         sub = dict(layer)
@@ -149,14 +158,15 @@ def opti_dnn(meta_data, hardware_constraints):
                         })
             else:
                 # scale up the ifmap to the ifmap based on the stride size.
-                data["ifmap"][0] = layer["ifmap"][0]*2/layer["stride"]
-                data["ifmap"][1] = layer["ifmap"][1]*2/layer["stride"]
+                for i in range(len(data["ifmap"])):
+                  data["ifmap"][i] = layer["ifmap"][i]*2/layer["stride"]
+                # add the result
                 results.append({
                         "data" : data,
                         "result" : single_layer_optimization(data, sys_info)
                         })
         else:
-            data["ofmap"] = [0,0]
+            data["ofmap"] = [0] * len(data["ifmap"])
             # scale down the ifmap to the ifmap based on the stride size.
             data["ofmap"][0] = layer["ifmap"][0]/layer["stride"]
             data["ofmap"][1] = layer["ifmap"][1]/layer["stride"]
