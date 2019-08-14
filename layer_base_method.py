@@ -25,9 +25,9 @@ class LayerBaseMethod(object):
 
     # input layer dimension
     H = None        # height of ofmap
-    W = None        # width of ifmap
-    Ci = None      # channels for weights
-    Co = None      # channels for ofmap
+    W = None        # width of ofmap
+    Ci = None       # channels for weights
+    Co = None       # channels for ofmap
 
     # on-chip buffer size
     bufi_size = None
@@ -88,6 +88,8 @@ class LayerBaseMethod(object):
         ofmap_tile_size = h_0*w_0*c_0
         ifmap_tile_size = (self.S*h_0+2)*(self.S*w_0+2)*self.Ci
         kernel_tile_size = self.K_h*self.K_w*self.Ci*c_0
+
+        # ofmap + weight transfer
         total_transfer = (ofmap_tile_size + kernel_tile_size) * total_batch
 
         # add additional data transfer
@@ -101,9 +103,9 @@ class LayerBaseMethod(object):
         A = self.A
         total_usage = xi * area_size
         round_up_val = math.ceil(float(xi/A))*A \
-            * math.ceil(float(area[0] * area[1])/A)*A
+            * math.ceil(float(area_size)/A)*A
 
-        return xi*area_size/round_up_val
+        return total_usage / round_up_val
 
     def compute_bound_cycle(self, util_rate):
         # total number of ops
@@ -123,8 +125,7 @@ class LayerBaseMethod(object):
         c_0 = min(self.Co/math.ceil(self.Co/round(x[0])), self.Co)
         w_0 = min(self.W/math.ceil(self.W/round(x[1])), self.W)
         h_0 =min(self.H/math.ceil(self.H/round(x[2])), self.H)
-        # check the result
-        # print(c_0, w_0, h_0, self.Co/c_0, self.W/w_0, self.H/h_0)
+
         # compute the total number of elements needed to be updated
         # if it is row-major.
         if row_major:
