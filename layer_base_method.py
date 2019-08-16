@@ -4,10 +4,6 @@
 import math
 import numpy as np
 
-###############################################################
-#                       general process                       #
-###############################################################
-
 class LayerBaseMethod(object):
     """docstring for LayerBaseMethod"""
     # info for systolic array
@@ -54,6 +50,10 @@ class LayerBaseMethod(object):
         self.Co = layer_info["out_channel"]
         [self.K_w, self.K_h] = layer_info["kernel"]
         self.S = layer_info["stride"]
+
+    ###############################################################
+    #                       general process                       #
+    ###############################################################
 
     # compute buffer utilization
     def buffer_utilization(self, x):
@@ -113,7 +113,7 @@ class LayerBaseMethod(object):
             (self.Ci*self.K_h*self.K_w)
 
         # systolic array calculation capacity
-        comp_cap = (self.A*self.A) * util_rate
+          comp_cap = (self.A*self.A) * util_rate
 
         return total_computation / comp_cap
 

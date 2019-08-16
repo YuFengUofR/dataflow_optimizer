@@ -6,36 +6,14 @@ import math
 import numpy as np
 from scipy.optimize import minimize
 
-
-# info for systolic array
-A = 16.0      # systolic array dimension
-
-# info for weights
-K_w = 3.0       # kernel width
-K_h = 3.0       # kernel height
-K_d = 3.0       # kernel disparity
-S = 1.0         # stride size
-
-# input layer dimension
-H = 128.0        # height of ofmap
-W = 128.0        # width of ofmap
-D = 128.0        # disparity ofmap 
-Ci = 128.0      # channels for weights
-Co = 128.0      # channels for ofmap
-
-# memory bandwith number of bytes can be transferred.
-B = 26.0/4
-
-# on-chip buffer size
-buffer_size = 1.0*1024.0*1024.0
+# my own library
+from layer3d_base_method import *
+from layer_optimizer import *
 
 # threshold for bounds
 # if the constraint result is negative but within this threshold,
 # it is still consider a valid result.
 Threshold = 10.0
-
-# array to store the result from the four different results
-res = []
 
 class Layer3dOptimizer(Layer3dBaseMethod, LayerOptimizer):
     """docstring for Layer3dOptimizer"""
@@ -51,54 +29,6 @@ class Layer3dOptimizer(Layer3dBaseMethod, LayerOptimizer):
     #                       general process                       #
     ###############################################################
 
-    def process_parameter(self, x, row_major, comp_bound):
-        global res
-        bound = "C"
-        # make the tile size even for every batch
-        c_0 = Co/math.ceil(Co/round(x[0]))
-        w_0 = W/math.ceil(W/round(x[1]))
-        h_0 = H/math.ceil(H/round(x[2]))
-        d_0 = D/math.ceil(D/round(x[3]))
-        # check the result
-        print(c_0, w_0, h_0, d_0, Co/c_0, W/w_0, H/h_0, D/d_0)
-        # compute the total number of elements needed to be updated
-        # if it is row-major.
-        if row_major:
-            # (ofmap + ifmap)*total_batch + (ofmap+weights)*Co/c_0
-            total_transfer = (h_0*w_0*d_0*c_0+(S*h_0+2)*(S*w_0+2)*(S*d_0+2)*Ci) \
-                              *(H*W*D*Co/(h_0*w_0*d_0*c_0)-Co/c_0)\
-                              +(h_0*w_0*d_0*c_0+K_h*K_w*K_d*Ci*c_0)*Co/c_0
-        # compute the total number of elements needed to be updated
-        # if it is channel-major.
-        else:
-            # (ofmap + weights)*total_batch + (ofmap+ifmap)*(H*W)/(h_0*w_0)
-            total_transfer = (h_0*w_0*c_0+K_h*K_w*K_d*Ci*c_0) * \
-                            (H*W*D*Co/(h_0*w_0*d_0*c_0)-H*W*D/(h_0*w_0*d_0)) \
-                            +(h_0*w_0*d_0*c_0+(S*h_0+2)*(S*w_0+2)*(S*d_0+2)*Ci)*H*W*D/(h_0*w_0*d_0)
-
-        # compute the utilization of systolic array
-        util_sys_arr = x[0]/(math.ceil(round(x[0]/A, 1))*A) *\
-                         x[1]*x[2]*x[3]/(math.ceil(round(x[1]*x[2]*x[3]/A, 1))*A)
-
-        # compute the utilization of systolic array
-        util_buf = buffer_constraint1([c_0, w_0, h_0, d_0])/buffer_size
-        # calculate the amount of cycles of computing all elements.
-        if comp_bound:
-            bound = "C"
-            total_cycle = (H*W*D*Co)*(Ci*K_h*K_w*K_d)/(A*A)/util_sys_arr
-        else:
-            bound = "M"
-            total_cycle = total_transfer/B
-
-        # print(x[0],(math.ceil(x[0]/A)*A), x[1]*x[2], (math.ceil(x[1]*x[2]/A)*A))
-        print("total_transfer", total_transfer, "total_cycle", total_cycle, \
-            "systolic_array_utilization", util_sys_arr, "buffer_utilization", util_buf)
-        res.append([int(total_transfer), int(total_cycle), util_sys_arr, \
-                    util_buf, x, Co/c_0, W/w_0, H/h_0, D/d_0, bound])
-        return [int(total_transfer), int(total_cycle), util_sys_arr, \
-                    util_buf, x, Co/c_0, W/w_0, H/h_0, D/d_0, bound]
-
-
     def init_guess(self):
         x0 = [min(self.A, self.Co), \
               min(math.floor(math.sqrt(self.A)), self.H), \
@@ -112,32 +42,12 @@ class Layer3dOptimizer(Layer3dBaseMethod, LayerOptimizer):
                 (1, self.D))
 
     ###############################################################
-    #                     general computations                    #
-    ###############################################################
-    def ofmap_tile(self, x):
-        return x[0]*x[1]*x[2]*x[3]
-
-    def weight_tile(self, num):
-        return self.Ci*self.K_h*K_w*self.K_d*num
-
-    def ifmap_tile(self, x):
-        S_2 = (self.K_h+1) / 2
-        return self.Ci*(self.S*x[1]+S_2)*(self.S*x[2]+S_2)*(self.S*x[3]+S_2)
-
-    def total_ofmap_size(self):
-        return self.H*self.W*self.D*self.Co
-
-    def total_weight_size(self):
-        return self.weight_tile(self.Co)
-
-
-    ###############################################################
     #                     general constraints                     #
     ###############################################################
     # the low bound of buffer size;
     # make sure the buffer utilization is always larger than 0
     def buffer_constraint1(self, x):
-        return LayerOptimizer.buffer_constaint1(self, x)
+        return LayerOptimizer.buffer_constaint1(self, x0)
 
     # the upper bound of the buffer size;
     # make sure the buffer utilization is
