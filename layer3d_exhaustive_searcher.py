@@ -63,7 +63,8 @@ class Layer3dExhaustiveSearcher(Layer3dStaticMethod):
 
         # no need to optimize the buffer for ofmap, because it is
         # bounded ifmap.
-        x = [x0[0], math.sqrt(x0[1]), math.sqrt(x0[1]), 1]
+        x = [x0[0], min(round(x0[1]**(1.0/3)), self.W),
+             min(round(x0[1]**(1.0/3)), self.H), min(round(x0[1]**(1.0/3)), self.D)]
         self.process_parameter(x, False, False)
         self.process_parameter(x, False, True)
         self.process_parameter(x, True, False)

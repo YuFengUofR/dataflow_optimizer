@@ -169,9 +169,14 @@ def opti_dnn(meta_data, hardware_constraints):
                         "result" : opti_deconv(layer, sys_info)
                         })
             else:
+                data["ofmap"] = [0] * len(data["ifmap"])
                 # scale up the ifmap to the ifmap based on the stride size.
-                for i in range(len(data["ifmap"])):
-                  data["ifmap"][i] = layer["ifmap"][i]*2/layer["stride"]
+                for i in range(len(data["ifmap"])-1):
+                    data["ifmap"][i] = layer["ifmap"][i]*2/layer["stride"]
+
+                # the last element is ofmap channel, so treat it separately
+                data["ofmap"][-1] = data["out_channel"]
+
                 # add the result
                 results.append({
                         "data" : data,
@@ -180,8 +185,11 @@ def opti_dnn(meta_data, hardware_constraints):
         else:
             data["ofmap"] = [0] * len(data["ifmap"])
             # scale down the ifmap to the ifmap based on the stride size.
-            data["ofmap"][0] = layer["ifmap"][0]/layer["stride"]
-            data["ofmap"][1] = layer["ifmap"][1]/layer["stride"]
+            for j in range(len(data["ifmap"])-1):
+                data["ofmap"][j] = layer["ifmap"][j]/layer["stride"]
+
+            # the last element is ofmap channel, so treat it separately
+            data["ofmap"][-1] = data["out_channel"]
 
             results.append({
                         "data" : data,
