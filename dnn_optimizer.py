@@ -15,6 +15,9 @@ import layer_static_method
 import layer_exhaustive_searcher
 import deconv_exhaustive_searcher
 
+import layer3d_optimizer
+import layer3d_exhaustive_searcher
+
 method = None
 buffer_partition = None
 enable = {
@@ -46,14 +49,23 @@ def single_layer_optimization(data, sys_info):
     # if "static" option is enabled, it will be prioritized
     if enable["static"]:
       return layer_static_method.\
-          LayerStaticMethod(data,sys_info, buffer_partition).optimize()
+          LayerStaticMethod(data, sys_info, buffer_partition).optimize()
 
     # check the potential method we use here.
     if method == "Constrained":
-        return layer_optimizer.LayerOptimizer(data, sys_info).optimize()
+        if data["type"] == "2D":
+            return layer_optimizer.\
+                LayerOptimizer(data, sys_info).optimize()
+        else:
+            return layer3d_optimizer.\
+                Layer3dOptimizer(data, sys_info).optimize()
     elif method == "Exhaustive":
-        return layer_exhaustive_searcher.\
-            LayerExhaustiveSearcher(data, sys_info).optimize()
+        if data["type"] == "2D":
+            return layer_exhaustive_searcher.\
+                LayerExhaustiveSearcher(data, sys_info).optimize()
+        else:
+            return layer3d_exhaustive_searcher.\
+                Layer3dExhaustiveSearcher(data, sys_info).optimize()
     elif method == "Combined":
         return layer_optimizer.\
             LayerOptimizer(data, sys_info, True).optimize()

@@ -13,7 +13,8 @@ class LayerBaseMethod(object):
     B = None
 
     # on-chip buffer size
-    buffer_size = None
+    buf_size = None
+
     # info for weights
     K_w = None       # kernel width
     K_h = None       # kernel height
@@ -113,7 +114,7 @@ class LayerBaseMethod(object):
             (self.Ci*self.K_h*self.K_w)
 
         # systolic array calculation capacity
-          comp_cap = (self.A*self.A) * util_rate
+        comp_cap = (self.A*self.A) * util_rate
 
         return total_computation / comp_cap
 

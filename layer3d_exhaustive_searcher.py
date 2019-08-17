@@ -17,7 +17,7 @@ class Layer3dExhaustiveSearcher(Layer3dStaticMethod):
 
     """docstring for LayerExhaustiveSearcher"""
     def __init__(self, data, sys_info):
-        super(LayerExhaustiveSearcher, self).__init__(data, sys_info, None)
+        super(Layer3dExhaustiveSearcher, self).__init__(data, sys_info, None)
         self.rets = []
 
     # optimize one layer
@@ -63,7 +63,7 @@ class Layer3dExhaustiveSearcher(Layer3dStaticMethod):
 
         # no need to optimize the buffer for ofmap, because it is
         # bounded ifmap.
-        x = [x0[0], math.sqrt(x0[1]), math.sqrt(x0[1])]
+        x = [x0[0], math.sqrt(x0[1]), math.sqrt(x0[1]), 1]
         self.process_parameter(x, False, False)
         self.process_parameter(x, False, True)
         self.process_parameter(x, True, False)

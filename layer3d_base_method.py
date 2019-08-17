@@ -7,7 +7,7 @@ import numpy as np
 # own library
 from layer_base_method import *
 
-class Layer3dbaseMethod(LayerBaseMethod):
+class Layer3dBaseMethod(LayerBaseMethod):
     """docstring for Layer3dBaseMethod"""
     # info for systolic array
     A = None      # systolic array dimension
@@ -57,7 +57,7 @@ class Layer3dbaseMethod(LayerBaseMethod):
         return x[0]*x[1]*x[2]*x[3]
 
     def weight_tile(self, num):
-        return self.Ci*self.K_h*K_w*self.K_d*num
+        return self.Ci*self.K_h*self.K_w*self.K_d*num
 
     def ifmap_tile(self, x):
         S_2 = (self.K_h+1) / 2
@@ -69,7 +69,6 @@ class Layer3dbaseMethod(LayerBaseMethod):
     def total_weight_size(self):
         return self.weight_tile(self.Co)
 
-
     # variables for optimization
     # this two has been encodes as x[3] = {c_0, h_0, w_0, d_0};
     # c_0  # number of channels per batch;
@@ -78,11 +77,18 @@ class Layer3dbaseMethod(LayerBaseMethod):
     #                       general process                       #
     ###############################################################
 
-    def row_major_data_transfer(h_0, w_0, d_0, c_0):
+    def buffer_utilization(self, x):
+        # buffer = ofmap + weights + ifmap
+        return (self.ofmap_tile(x) +
+                self.weight_tile(x[0]) +
+                self.ifmap_tile(x))
+
+    def row_major_data_transfer(self, h_0, w_0, d_0, c_0):
         # ofmap, ifmap and kernel tile size
         S_2 = (self.K_h+1) / 2
         ofmap_tile_size = h_0*w_0*d_0*c_0
-        ifmap_tile_size = ((self.S*h_0+S_2) * (self.S*w_0+S_2) * \
+        ifmap_tile_size = ((self.S*h_0+S_2) *
+                           (self.S*w_0+S_2) *
                            (self.S*d_0+S_2) * self.Ci)
         kernel_tile_size = self.K_h*self.K_w*self.K_d*self.Ci*c_0
 
@@ -90,20 +96,21 @@ class Layer3dbaseMethod(LayerBaseMethod):
         total_batch = (self.H*self.W*self.D*self.Co) / ofmap_tile_size
 
         # ofmap + ifmap transfer
-        total_transfer = (ofmap_tile_size + ifmap_tile_size) * \
-            (total_batch - self.Co/c_0)
+        total_transfer = ((ofmap_tile_size + ifmap_tile_size) *
+                          (total_batch - self.Co/c_0))
 
         # add additional data transfer
         total_transfer += (ofmap_tile_size + kernel_tile_size) * (self.Co/c_0)
 
         return total_transfer
 
-    def channel_major_data_transfer(h_0, w_0, d_0, c_0):
+    def channel_major_data_transfer(self, h_0, w_0, d_0, c_0):
         S_2 = (self.K_h+1) / 2
 
         # ofmap and ifmap tile size
         ofmap_tile_size = h_0*w_0*d_0*c_0
-        ifmap_tile_size = ((self.S*h_0+S_2) * (self.S*w_0+S_2) * \
+        ifmap_tile_size = ((self.S*h_0+S_2) *
+                           (self.S*w_0+S_2) *
                            (self.S*d_0+S_2) * self.Ci)
         kernel_tile_size = self.K_h*self.K_w*self.K_d*self.Ci*c_0
 
@@ -131,19 +138,13 @@ class Layer3dbaseMethod(LayerBaseMethod):
 
     def compute_bound_cycle(self, util_rate):
         # total number of ops
-        total_computation = (self.H*self.W*self.Dself.Co)*\
-            (self.Ci*self.K_h*self.K_w*self.K_d)
+        total_computation = ((self.H*self.W*self.D*self.Co) *
+                             (self.Ci*self.K_h*self.K_w*self.K_d))
 
         # systolic array calculation capacity
         comp_cap = (self.A*self.A) * util_rate
 
         return total_computation / comp_cap
-
-    def buffer_util(self, x):
-        # buffer = ofmap + weights + ifmap
-        return (self.ofmap_tile(x) +
-                self.weight_tile(x[0]) +
-                self.ifmap_tile(x))
 
     def process_parameter(self, x, row_major, comp_bound):
         bound = "C"
@@ -166,10 +167,10 @@ class Layer3dbaseMethod(LayerBaseMethod):
             total_transfer = self.channel_major_data_transfer(h_0, w_0, d_0, c_0)
 
         # compute the utilization of systolic array
-        util_sys_arr = self..systolic_array_utilization(c_0, [w_0, h_0, d_0])
+        util_sys_arr = self.systolic_array_utilization(c_0, [w_0, h_0, d_0])
 
         # compute the utilization of systolic array
-        util_buf = self.buffer_util([c_0, w_0, h_0, d_0])/self.buf_size
+        util_buf = self.buffer_utilization([c_0, w_0, h_0, d_0])/self.buf_size
 
         if util_buf > 1.01:
             return
@@ -192,35 +193,4 @@ class Layer3dbaseMethod(LayerBaseMethod):
         }
         self.res.append(ret)
         return
-
-    def init_guess(self):
-        x0 = [min(self.A, self.Co), \
-              min(math.floor(math.sqrt(self.A)), self.H), \
-              min(math.floor(math.sqrt(self.A)), self.W), 1]
-        return x0
-
-    def veriable_boundary(self):
-        return ((min(self.A, self.Co), self.Co),
-                (min(math.floor(math.sqrt(self.A)), self.H), self.H), \
-                (min(math.floor(math.sqrt(self.A)), self.W), self.W), \
-                (1, self.D))
-
-    ###############################################################
-    #                     general computations                    #
-    ###############################################################
-    def ofmap_tile(self, x):
-        return x[0]*x[1]*x[2]*x[3]
-
-    def weight_tile(self, num):
-        return self.Ci*self.K_h*K_w*self.K_d*num
-
-    def ifmap_tile(self, x):
-        S_2 = (self.K_h+1) / 2
-        return self.Ci*(self.S*x[1]+S_2)*(self.S*x[2]+S_2)*(self.S*x[3]+S_2)
-
-    def total_ofmap_size(self):
-        return self.H*self.W*self.D*self.Co
-
-    def total_weight_size(self):
-        return self.weight_tile(self.Co)
 

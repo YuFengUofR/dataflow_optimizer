@@ -10,7 +10,7 @@ from layer3d_base_method import *
 ###############################################################
 #                       general process                       #
 ###############################################################
-class LayerStaticMethod(Layer3dBaseMethod):
+class Layer3dStaticMethod(Layer3dBaseMethod):
 
     # array to store the result from the four different results
     res = []

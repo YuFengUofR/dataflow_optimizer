@@ -24,7 +24,7 @@ argparser.add_argument("--combine", type=bool, default=False,
                         help="enable to combine the sub-kernels durting compute")
 argparser.add_argument("--model_type", default="2D", choices=["2D", "3D"],
                         help="DNN model convolution type: 2D or 3D.")
-argparser.add_argument("--ifmap", nargs="+", type=int, required=True,
+argparser.add_argument("--ifmap", nargs="+", type=int, required=False,
                         help="the ifmap dimemsion, order: [W H C]")
 argparser.add_argument("--ifmap3d", nargs="+", type=int, required=False,
                         help="the ifmap dimemsion, order: [W H D C]")
@@ -106,8 +106,8 @@ def import_dnn(filename, ifmap_dim, ifmap3d_dim):
                 # increase the deconv ofmap by two, as default,
                 # we only consider stride of 1
                 ifmap3d_dim = [ifmap3d_dim[0]*2/prev_layer["stride"], \
-                               ifmap_dim[1]*2/prev_layer["stride"], \
-                               ifmap_dim[2]*2/prev_layer["stride"], \
+                               ifmap3d_dim[1]*2/prev_layer["stride"], \
+                               ifmap3d_dim[2]*2/prev_layer["stride"], \
                                prev_layer["out_channel"]]
             else:
                 # if it is Conv, scale down the ifmap dimemsion by stride;

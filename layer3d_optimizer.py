@@ -1,7 +1,6 @@
 #!/usr/bin/python2.7
 
 # public library
-import cv2 as cv
 import math
 import numpy as np
 from scipy.optimize import minimize
@@ -35,7 +34,7 @@ class Layer3dOptimizer(Layer3dBaseMethod, LayerOptimizer):
               min(math.floor(math.sqrt(self.A)), self.W), 1]
         return x0
 
-    def veriable_boundary(self):
+    def variable_boundary(self):
         return ((min(self.A, self.Co), self.Co),
                 (min(math.floor(math.sqrt(self.A)), self.H), self.H), \
                 (min(math.floor(math.sqrt(self.A)), self.W), self.W), \
@@ -47,7 +46,7 @@ class Layer3dOptimizer(Layer3dBaseMethod, LayerOptimizer):
     # the low bound of buffer size;
     # make sure the buffer utilization is always larger than 0
     def buffer_constraint1(self, x):
-        return LayerOptimizer.buffer_constaint1(self, x0)
+        return self.buffer_utilization(x)
 
     # the upper bound of the buffer size;
     # make sure the buffer utilization is
@@ -74,6 +73,7 @@ class Layer3dOptimizer(Layer3dBaseMethod, LayerOptimizer):
     # make sure the load for row-major is always less than
     # load for channel-major, range : [0, +inf]
     def row_major_constraint(self, x):
+        S_2 = (self.K_h+1)/2
         # simplified from K^3*Ci*c_0 > C*(S^3*h_0*w_0*d_0)
         return self.K_h*self.K_w*self.K_d*x[0] - \
             (self.S*x[1]+S_2)*(self.S*x[2]+S_2)*(self.S*x[3]+S_2);
@@ -86,7 +86,7 @@ class Layer3dOptimizer(Layer3dBaseMethod, LayerOptimizer):
     # range : [0, +inf]
     def row_major_mem_bound_constraint(self, x):
       return (self.ofmap_tile(x) + self.ifmap_tile(x)) / self.B \
-          - self.weight_tile(1)/(self.A*self.A)*self.ofmap_tile(x))
+          - self.weight_tile(1)/(self.A*self.A)*self.ofmap_tile(x)
 
     # make sure the process is always compute-bound;
     # which is the latency for compute is always
@@ -96,7 +96,7 @@ class Layer3dOptimizer(Layer3dBaseMethod, LayerOptimizer):
     # range : [0, +inf]
     def row_major_comp_bound_constraint(self, x):
         return self.weight_tile(1) / (self.A*self.A)*self.ofmap_tile(x) \
-            - (self.ofmap_tile(x) + self.ifmap+_tile(x)) / self.B
+            - (self.ofmap_tile(x) + self.ifmap_tile(x)) / self.B
 
     ###############################################################
     #     channel-major constraint solving obj and constraints    #
@@ -107,6 +107,7 @@ class Layer3dOptimizer(Layer3dBaseMethod, LayerOptimizer):
     # (K^3*Ci*c_0+h_0*w_0*d_0*c_0)*(H*W*D*Co)/(h_0*w_0*d_0*c_0)
     # + [(S*h_0+2)(S*w_0+2)(S*d_0+2)*Ci + h_0*w_0*d_0*c_0]*(H*W*D)/(h_0*w_0*d_0)
     def channel_major_mem_obj(self, x):
+        S_2 = (self.K_h+1)/2
         return (self.total_weight_size)/(x[1]*x[2]*x[3]) + \
                 (self.S*x[1]+S_2)*(self.S*x[2]+S_2)*(self.S*x[3]+S_2)/\
                 (x[1]*x[2]*x[3])
@@ -137,8 +138,9 @@ class Layer3dOptimizer(Layer3dBaseMethod, LayerOptimizer):
     # greater than lantecy of compute;
     # c_0*(h_0*w_0+K^3*C)/B >= (K^3*C/A^2)*c_0*(h_0*w_0*d_0)
     # range : [0, +inf]
-    def channel_major_comp_bound_constraint(x):
-        return self.K_h*self.K_w*self.K_d*Co/(self.A*self.A)*x[1]*x[2]*x[3] \
+    def channel_major_comp_bound_constraint(self, x):
+        return (self.K_h*self.K_w*self.K_d*self.Co) \
+            / (self.A*self.A)*x[1]*x[2]*x[3] \
             - (x[1]*x[2]+self.K_h*self.K_w*self.K_d*self.Co)/self.B
 
 
