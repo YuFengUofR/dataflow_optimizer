@@ -9,7 +9,6 @@ import sys
 
 
 # import my own modules
-from dnn_analysis import *
 import layer_optimizer
 import layer_static_method
 import layer_exhaustive_searcher
@@ -173,6 +172,7 @@ def opti_dnn(meta_data, hardware_constraints):
                 # scale up the ifmap to the ifmap based on the stride size.
                 for i in range(len(data["ifmap"])-1):
                     data["ifmap"][i] = layer["ifmap"][i]*2/layer["stride"]
+                    data["ofmap"][j] = layer["ifmap"][j]/layer["stride"]
 
                 # the last element is ofmap channel, so treat it separately
                 data["ofmap"][-1] = data["out_channel"]
@@ -195,8 +195,5 @@ def opti_dnn(meta_data, hardware_constraints):
                         "data" : data,
                         "result" : single_layer_optimization(data, sys_info)
                         })
-
-        # append last result into meta_data
-        meta_data["dnn"][i]["result"] = results[-1]
 
     return results

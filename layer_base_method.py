@@ -160,7 +160,7 @@ class LayerBaseMethod(object):
             "total_cycle": round(total_cycle),
             "systolic_array_utilization": util_sys_arr,
             "buffer_utilization": util_buf,
-            "c_0, w_0, h_0": [c_0, w_0, h_0],
+            "c_0, w_0, h_0": [round(c_0), round(w_0), round(h_0)],
             "Tile size" : [self.Co/c_0, self.W/w_0, self.H/h_0],
             "Bound" : bound
         }

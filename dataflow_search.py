@@ -1,10 +1,10 @@
-#!/usr/bin/python2.7
 
 import argparse
 import numpy as np
 import scipy
 import sys
 import pprint
+import json
 
 # import my own modules
 import dnn_optimizer
@@ -164,7 +164,6 @@ if __name__== "__main__":
                                           bit_width=args.bit_width)
 
     # start the optimization main routine
-    res = dnn_optimizer.opti_dnn(meta_data, hw_constraints)
+    meta_data["dnn_result"] = dnn_optimizer.opti_dnn(meta_data, hw_constraints)
 
     pprint.pprint(meta_data)
-
