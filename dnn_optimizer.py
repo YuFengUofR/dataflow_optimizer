@@ -1,8 +1,4 @@
 #!/usr/bin/python2.7
-import matplotlib
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-from matplotlib.ticker import FuncFormatter
 import numpy as np
 import scipy
 import sys
